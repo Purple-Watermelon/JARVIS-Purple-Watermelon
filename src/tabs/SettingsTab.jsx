@@ -17,29 +17,31 @@ export default function SettingsTab({ cats, setCats, gTags, setGTags, discReason
     setCats(p => ({ ...p, [c]: [] }));
     setSelCat(c); setNewCat('');
   };
-
   const delCat = cat => {
     const n = { ...cats }; delete n[cat];
     setCats(n); setSelCat(Object.keys(n)[0] || '');
   };
-
   const addSub = () => {
     const s = newSub.trim();
     if (!s || (cats[selCat] || []).includes(s)) return;
     setCats(p => ({ ...p, [selCat]: [...(p[selCat]||[]), s] }));
     setNewSub('');
   };
-
   const delSub = (cat, sub) => setCats(p => ({ ...p, [cat]: (p[cat]||[]).filter(s => s !== sub) }));
-
   const addTag = () => {
     let t = newTag.trim(); if (!t) return;
     if (!t.startsWith('#')) t = '#' + t;
     if (!gTags.includes(t)) setGTags(p => [...p, t]);
     setNewTag('');
   };
-
   const delTag = t => setGTags(p => p.filter(x => x !== t));
+  const addDisc = () => {
+    const d = newDisc.trim();
+    if (!d || (discReasons||[]).includes(d)) return;
+    setDiscReasons(p => [...p, d]);
+    setNewDisc('');
+  };
+  const delDisc = r => setDiscReasons(p => p.filter(x => x !== r));
 
   const AddBtn = ({ onClick }) => (
     <button onClick={onClick} style={{ background: 'var(--accent)', color: '#fff', borderRadius: 10, padding: '10px 16px', fontWeight: 700, flexShrink: 0 }}>추가</button>
@@ -49,7 +51,7 @@ export default function SettingsTab({ cats, setCats, gTags, setGTags, discReason
     <div style={{ padding: 16, paddingBottom: 90, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 4 }}>⚙️ 설정</div>
 
-      {/* Category management */}
+      {/* 카테고리 관리 */}
       <Card>
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>카테고리 관리</div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -66,7 +68,6 @@ export default function SettingsTab({ cats, setCats, gTags, setGTags, discReason
             }}>{c}</button>
           ))}
         </div>
-
         {selCat && cats[selCat] !== undefined && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -89,22 +90,26 @@ export default function SettingsTab({ cats, setCats, gTags, setGTags, discReason
         )}
       </Card>
 
-      {/* Tag management */}
+      {/* 할인 이유 관리 */}
       <Card>
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>할인 이유 관리</div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <input style={{ ...inp, flex: 1 }} placeholder="새 할인 이유" value={newDisc} onChange={e => setNewDisc(e.target.value)} onKeyDown={e => { if(e.key==='Enter' && newDisc.trim() && !discReasons.includes(newDisc.trim())) { setDiscReasons(p=>[...p, newDisc.trim()]); setNewDisc(''); }}} />
-          <AddBtn onClick={() => { const d=newDisc.trim(); if(d && !discReasons.includes(d)) { setDiscReasons(p=>[...p,d]); setNewDisc(''); }}} />
+          <input style={{ ...inp, flex: 1 }} placeholder="새 할인 이유" value={newDisc} onChange={e => setNewDisc(e.target.value)} onKeyDown={e => e.key==='Enter'&&addDisc()} />
+          <AddBtn onClick={addDisc} />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {(discReasons||[]).map(r => (
             <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--green-bg)', borderRadius: 20, padding: '6px 10px 6px 14px', border: '1px solid var(--border)' }}>
               <span style={{ fontSize: 13 }}>{r}</span>
-              <button onClick={() => setDiscReasons(p=>p.filter(x=>x!==r))} style={{ color: 'var(--red)', fontSize: 18, lineHeight: 1, padding: '0 2px' }}>×</button>
+              <button onClick={() => delDisc(r)} style={{ color: 'var(--red)', fontSize: 18, lineHeight: 1, padding: '0 2px' }}>×</button>
             </div>
           ))}
         </div>
       </Card>
+
+      {/* 태그 관리 */}
+      <Card>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>태그 관리</div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <input style={{ ...inp, flex: 1 }} placeholder="#새 태그" value={newTag} onChange={e => setNewTag(e.target.value)} onKeyDown={e => e.key==='Enter'&&addTag()} />
           <AddBtn onClick={addTag} />
@@ -117,19 +122,18 @@ export default function SettingsTab({ cats, setCats, gTags, setGTags, discReason
             </div>
           ))}
         </div>
-        </div>
       </Card>
 
-      {/* App info */}
+      {/* 앱 정보 */}
       <Card>
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>앱 정보</div>
         <div style={{ fontSize: 13, color: 'var(--sub)', lineHeight: 2 }}>
           <div>버전: 1.0.0</div>
-          <div>저장 방식: 기기 로컬 (localStorage)</div>
-          <div style={{ fontSize:12, marginTop:8, background:'var(--bg)', borderRadius:10, padding:10, lineHeight:1.8 }}>
-            ⚠️ 데이터는 브라우저에 저장됩니다.<br/>
-            앱 삭제 또는 캐시 초기화 시 데이터가 사라질 수 있어요.<br/>
-            중요 데이터는 주기적으로 백업을 권장합니다.
+          <div>저장 방식: Firebase 클라우드</div>
+          <div style={{ fontSize: 12, marginTop: 8, background: 'var(--bg)', borderRadius: 10, padding: 10, lineHeight: 1.8 }}>
+            ✅ 데이터가 클라우드에 안전하게 저장됩니다.<br/>
+            PC와 폰에서 실시간 동기화돼요.<br/>
+            Firebase (Google) 서버에 저장됩니다.
           </div>
         </div>
       </Card>
