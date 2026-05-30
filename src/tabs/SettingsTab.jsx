@@ -117,6 +117,7 @@ export default function SettingsTab({ cats, setCats, gTags, setGTags, discReason
             </div>
           ))}
         </div>
+        </div>
       </Card>
 
       {/* App info */}
