@@ -17,6 +17,10 @@ export default function LedgerTab({ data, setData, cats, gTags, setGTags, essIte
   const [modalEntry, setModalEntry] = useState(null);
   const [aiResult, setAiResult] = useState({});
   const [aiLoading, setAiLoading] = useState(false);
+  const [selectedCat, setSelectedCat] = useState(null);
+  const [selectedSub, setSelectedSub] = useState(null);
+  const [selectedCat, setSelectedCat] = useState(null);
+  const [selectedSub, setSelectedSub] = useState(null);
 
   const entries = data || [];
   const F = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -246,11 +250,41 @@ export default function LedgerTab({ data, setData, cats, gTags, setGTags, essIte
                 <DonutChart data={donutData} size={160} />
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {byCat.map(([cat, amt], i) => (
-                    <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 10, height: 10, borderRadius: 3, background: PALETTE[i%PALETTE.length], flexShrink: 0 }} />
-                      <span style={{ flex: 1, fontSize: 13 }}>{cat}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>{fmt(amt)}원</span>
-                      <span style={{ fontSize: 11, color: 'var(--sub)', width: 36, textAlign: 'right' }}>{totExp ? Math.round(amt/totExp*100) : 0}%</span>
+                    <div key={cat}>
+                      <div onClick={() => setSelectedCat(selectedCat===cat ? null : cat)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '6px 0' }}>
+                        <div style={{ width: 10, height: 10, borderRadius: 3, background: PALETTE[i%PALETTE.length], flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: selectedCat===cat ? 700 : 400 }}>{cat}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>{fmt(amt)}원</span>
+                        <span style={{ fontSize: 11, color: 'var(--sub)', width: 36, textAlign: 'right' }}>{totExp ? Math.round(amt/totExp*100) : 0}%</span>
+                        <span style={{ fontSize: 12, color: 'var(--accent)' }}>{selectedCat===cat ? '▲' : '▶'}</span>
+                      </div>
+                      {selectedCat===cat && (
+                        <div style={{ marginLeft: 18, marginBottom: 8 }}>
+                          {Object.entries(
+                            expEntries.filter(e=>e.cat===cat).reduce((acc,e)=>{ acc[e.sub||e.cat]=(acc[e.sub||e.cat]||0)+e.amount; return acc; },{})
+                          ).sort((a,b)=>b[1]-a[1]).map(([sub, subAmt]) => (
+                            <div key={sub}>
+                              <div onClick={() => setSelectedSub(selectedSub===sub ? null : sub)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
+                                <span style={{ color: 'var(--sub)', fontWeight: selectedSub===sub ? 700 : 400 }}>{sub}</span>
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                  <span style={{ fontWeight: 600 }}>{fmt(subAmt)}원</span>
+                                  <span style={{ fontSize: 11, color: 'var(--accent)' }}>{selectedSub===sub ? '▲' : '▶'}</span>
+                                </div>
+                              </div>
+                              {selectedSub===sub && (
+                                <div style={{ marginLeft: 10, marginTop: 4, marginBottom: 4 }}>
+                                  {expEntries.filter(e=>e.cat===cat&&(e.sub||e.cat)===sub).sort((a,b)=>new Date(b.datetime)-new Date(a.datetime)).map(e => (
+                                    <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '4px 0', color: 'var(--sub)' }}>
+                                      <span>{toDay(e.datetime)} {e.name||e.sub||e.cat}</span>
+                                      <span style={{ fontWeight: 600, color: 'var(--text)' }}>{fmt(e.amount)}원</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
