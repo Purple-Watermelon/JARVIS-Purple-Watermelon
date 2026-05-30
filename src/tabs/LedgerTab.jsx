@@ -10,7 +10,10 @@ export default function LedgerTab({ data, setData, cats, gTags, setGTags, essIte
   const [ym, setYm] = useState(toYM(new Date().toISOString()));
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({});
+  const [form, setForm] = useState({
+  discAmt: '',      // 할인 금액
+  discReason: '',   // 할인 이유
+});
   const [modalEntry, setModalEntry] = useState(null);
   const [aiResult, setAiResult] = useState({});
   const [aiLoading, setAiLoading] = useState(false);
@@ -63,7 +66,9 @@ export default function LedgerTab({ data, setData, cats, gTags, setGTags, essIte
       cat: form.cat,
       sub: form.sub || '',
       name: form.name || form.sub || form.cat,
-      amount: Number(form.amount),
+      amount: Number(form.amount) || 0,
+      discAmt: Number(form.discAmt) || 0,
+      discReason: form.discReason || '',
       tags: form.tags || [],
       memo: form.memo || '',
       essId: form.essId || '',
@@ -88,7 +93,7 @@ export default function LedgerTab({ data, setData, cats, gTags, setGTags, essIte
   const del = id => { setData(p => p.filter(e => e.id !== id)); setModalEntry(null); };
 
   // Discount calculator state
-  const [disc, setDisc] = useState({ price: '', pct: '' });
+  const [disc, setDisc] = useState({ price: '', pct: '', reason: '' });
   const discResult = disc.price && disc.pct ? Math.round(parseAmount(disc.price) * (1 - Number(disc.pct) / 100)) : null;
 
   // ── AI Analysis ────────────────────────────────────────────────────────
@@ -342,21 +347,42 @@ export default function LedgerTab({ data, setData, cats, gTags, setGTags, essIte
           {/* Amount */}
           <div style={{ marginBottom: 14 }}><label style={lbl}>금액 *</label><AmountInput value={form.amount} onChange={v => F('amount', v)} /></div>
 
+          {/* 할인 */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={lbl}>할인 금액 (선택)</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <AmountInput value={form.discAmt} onChange={v => F('discAmt', v)} placeholder="0" />
+              <select style={{...inp, flex:1}} value={form.discReason||''} onChange={e => F('discReason', e.target.value)}>
+                <option value="">이유 선택</option>
+                {(discReasons||[]).map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            {form.discAmt > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>
+                실결제: {fmtAmount((Number(form.amount)||0) - (Number(form.discAmt)||0))}원
+              </div>
+            )}
+          </div>
+
           {/* Discount calculator */}
           <details style={{ marginBottom: 14 }}>
             <summary style={{ fontSize: 12, color: 'var(--accent)', cursor: 'pointer', marginBottom: 8 }}>🏷️ 할인 계산기</summary>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap:'wrap' }}>
               <AmountInput value={disc.price} onChange={v => setDisc(p=>({...p,price:v}))} placeholder="정가" />
               <input style={{...inp,width:70}} placeholder="%" value={disc.pct} onChange={e => setDisc(p=>({...p,pct:e.target.value}))} inputMode="numeric" />
+              <select style={{...inp}} value={disc.reason||''} onChange={e => setDisc(p=>({...p,reason:e.target.value}))}>
+                <option value="">할인 이유</option>
+                {(discReasons||[]).map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
               {discResult && (
-                <button onClick={() => F('amount', discResult)} style={{ flexShrink:0, padding:'10px 12px', borderRadius:10, background:'var(--accent)', color:'#fff', fontWeight:700, fontSize:13 }}>
+                <button onClick={() => { F('amount', discResult); F('discAmt', parseAmount(disc.price) - discResult); F('discReason', disc.reason); }} style={{ flexShrink:0, padding:'10px 12px', borderRadius:10, background:'var(--accent)', color:'#fff', fontWeight:700, fontSize:13 }}>
                   {fmtAmount(discResult)}원 적용
                 </button>
               )}
             </div>
           </details>
 
-          {/* Date & Time */}
+{/* Date & Time */}
           <div style={{ marginBottom: 14 }}>
             <label style={lbl}>날짜</label>
             <input style={inp} type="date" value={form.timeObj?.date||new Date().toISOString().slice(0,10)} onChange={e => F('timeObj', {...(form.timeObj||{}), date:e.target.value})} />
