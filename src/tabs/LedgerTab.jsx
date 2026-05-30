@@ -5,7 +5,7 @@ import { Card, Modal, MonthNav, SaveBtn, AmountInput, DonutChart } from '../comp
 const lbl = { fontSize: 11, color: 'var(--sub)', display: 'block', marginBottom: 5, fontWeight: 600 };
 const inp = { width: '100%', border: '1.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: 'var(--card)', color: 'var(--text)', outline: 'none', WebkitAppearance: 'none' };
 
-export default function LedgerTab({ data, setData, cats, gTags, setGTags, essItems, setEssItems }) {
+export default function LedgerTab({ data, setData, cats, gTags, setGTags, essItems, setEssItems, discReasons, setDiscReasons }) {
   const [subTab, setSubTab] = useState('기록');
   const [ym, setYm] = useState(toYM(new Date().toISOString()));
   const [showForm, setShowForm] = useState(false);
