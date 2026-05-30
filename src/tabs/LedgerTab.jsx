@@ -415,7 +415,7 @@ export default function LedgerTab({ data, setData, cats, gTags, setGTags, essIte
           {/* Memo */}
           <div style={{ marginBottom: 14 }}><label style={lbl}>메모</label><textarea style={inp} rows={2} placeholder="참고 사항" value={form.memo||''} onChange={e => F('memo', e.target.value)} /></div>
 
-          <SaveBtn onClick={save} disabled={!form.amount||!form.cat} />
+          <SaveBtn onClick={save} disabled={form.amount===''||form.amount===undefined||!form.cat} />
         </Modal>
       )}
     </div>
