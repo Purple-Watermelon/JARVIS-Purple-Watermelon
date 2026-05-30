@@ -97,6 +97,14 @@ export const DEFAULT_CATS = {
 
 export const SAVINGS_SET = new Set(['저축']);
 
+export const DEFAULT_DISCOUNT_REASONS = [
+  '카드 할인',
+  '포인트 사용',
+  '쿠폰',
+  '멤버십 할인',
+  '행사 할인',
+];
+
 export const PALETTE = [
   '#7c5cbf','#e05252','#3dbf6c','#e8a838',
   '#5b8dee','#e8406a','#5ac8fa','#af52de',
