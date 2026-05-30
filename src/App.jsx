@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Store, DEFAULT_CATS } from './utils/helpers';
+import { Store, DEFAULT_CATS, FIREBASE_KEYS } from './utils/helpers';
+import { db } from './firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import TodoTab    from './tabs/TodoTab';
 import LedgerTab  from './tabs/LedgerTab';
 import DiaryTab   from './tabs/DiaryTab';
@@ -36,30 +38,38 @@ export default function App() {
   const [cats,       setCats]       = useState(DEFAULT_CATS);
   const [gTags,      setGTags]      = useState(['#사치','#스트레스','#건강','#필수']);
 
-  // Load all
+const USER_ID = 'subin'; 
+
+  // Load all from Firebase
   useEffect(() => {
-    const td  = Store.get(KEYS.todo);
-    const ld  = Store.get(KEYS.ledger);
-    const dd  = Store.get(KEYS.diary);
-    const ed  = Store.get(KEYS.ess);
-    const cd  = Store.get(KEYS.cats);
-    const tgs = Store.get(KEYS.tags);
-    if (td)  setTodoData(td);
-    if (ld)  setLedgerData(ld);
-    if (dd)  setDiaryData(dd);
-    if (ed)  setEssItems(ed);
-    if (cd)  setCats(cd);
-    if (tgs) setGTags(tgs);
-    setReady(true);
+    const load = async () => {
+      try {
+        const keys = ['todo','ledger','diary','ess','cats','tags'];
+        const docs = await Promise.all(keys.map(k => getDoc(doc(db, k, USER_ID))));
+        const [td, ld, dd, ed, cd, tgs] = docs.map(d => d.exists() ? d.data().value : null);
+        if (td)  setTodoData(td);
+        if (ld)  setLedgerData(ld);
+        if (dd)  setDiaryData(dd);
+        if (ed)  setEssItems(ed);
+        if (cd)  setCats(cd);
+        if (tgs) setGTags(tgs);
+      } catch(e) { console.error('Firebase load error:', e); }
+      setReady(true);
+    };
+    load();
   }, []);
 
-  // Persist
-  useEffect(() => { if (ready) Store.set(KEYS.todo,   todoData);   }, [todoData,   ready]);
-  useEffect(() => { if (ready) Store.set(KEYS.ledger, ledgerData); }, [ledgerData, ready]);
-  useEffect(() => { if (ready) Store.set(KEYS.diary,  diaryData);  }, [diaryData,  ready]);
-  useEffect(() => { if (ready) Store.set(KEYS.ess,    essItems);   }, [essItems,   ready]);
-  useEffect(() => { if (ready) Store.set(KEYS.cats,   cats);       }, [cats,       ready]);
-  useEffect(() => { if (ready) Store.set(KEYS.tags,   gTags);      }, [gTags,      ready]);
+  // Save to Firebase
+  const save = async (key, value) => {
+    try { await setDoc(doc(db, key, USER_ID), { value }); } catch(e) { console.error('Firebase save error:', e); }
+  };
+
+  useEffect(() => { if (ready) save('todo',   todoData);   }, [todoData,   ready]);
+  useEffect(() => { if (ready) save('ledger', ledgerData); }, [ledgerData, ready]);
+  useEffect(() => { if (ready) save('diary',  diaryData);  }, [diaryData,  ready]);
+  useEffect(() => { if (ready) save('ess',    essItems);   }, [essItems,   ready]);
+  useEffect(() => { if (ready) save('cats',   cats);       }, [cats,       ready]);
+  useEffect(() => { if (ready) save('tags',   gTags);      }, [gTags,      ready]);
 
   if (!ready) return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100vh', background:'var(--bg)' }}>
