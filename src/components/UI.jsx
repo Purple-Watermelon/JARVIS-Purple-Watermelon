@@ -133,7 +133,7 @@ export function AddRowBtn({ onClick, label = '+ 추가하기' }) {
   return (
     <button onClick={onClick} style={{
       width: '100%', padding: '10px 16px', fontSize: 12,
-      color: 'var(--accent2)', background: 'none', border: 'none',
+      color: 'var(--sub)', background: 'none', border: 'none',
       cursor: 'pointer', textAlign: 'left', opacity: 0.8,
     }}>{label}</button>
   );
