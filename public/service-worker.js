@@ -1,11 +1,7 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_NAME = 'jarvis-purple-v1';
-const urlsToCache = ['/'];
+const CACHE_NAME = 'jarvis-purple-v2';
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
-  );
   self.skipWaiting();
 });
 
@@ -19,7 +15,21 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // API 요청은 캐시 안 함
+  if (event.request.url.includes('firestore') || 
+      event.request.url.includes('googleapis') ||
+      event.request.url.includes('anthropic')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+  // 나머지는 네트워크 우선, 실패시 캐시
   event.respondWith(
-    caches.match(event.request).then(response => response || fetch(event.request))
+    fetch(event.request)
+      .then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
