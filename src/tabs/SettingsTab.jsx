@@ -4,11 +4,12 @@ import { Card } from '../components/UI';
 const lbl = { fontSize: 11, color: 'var(--sub)', display: 'block', marginBottom: 5, fontWeight: 600 };
 const inp = { width: '100%', border: '1.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: 'var(--card)', color: 'var(--text)', outline: 'none', WebkitAppearance: 'none' };
 
-export default function SettingsTab({ cats, setCats, gTags, setGTags }) {
+export default function SettingsTab({ cats, setCats, gTags, setGTags, discReasons, setDiscReasons }) {
   const [selCat, setSelCat] = useState(Object.keys(cats)[0] || '');
   const [newCat, setNewCat] = useState('');
   const [newSub, setNewSub] = useState('');
   const [newTag, setNewTag] = useState('');
+  const [newDisc, setNewDisc] = useState('');
 
   const addCat = () => {
     const c = newCat.trim();
@@ -90,7 +91,20 @@ export default function SettingsTab({ cats, setCats, gTags, setGTags }) {
 
       {/* Tag management */}
       <Card>
-        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>태그 관리</div>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>할인 이유 관리</div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <input style={{ ...inp, flex: 1 }} placeholder="새 할인 이유" value={newDisc} onChange={e => setNewDisc(e.target.value)} onKeyDown={e => { if(e.key==='Enter' && newDisc.trim() && !discReasons.includes(newDisc.trim())) { setDiscReasons(p=>[...p, newDisc.trim()]); setNewDisc(''); }}} />
+          <AddBtn onClick={() => { const d=newDisc.trim(); if(d && !discReasons.includes(d)) { setDiscReasons(p=>[...p,d]); setNewDisc(''); }}} />
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {(discReasons||[]).map(r => (
+            <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--green-bg)', borderRadius: 20, padding: '6px 10px 6px 14px', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 13 }}>{r}</span>
+              <button onClick={() => setDiscReasons(p=>p.filter(x=>x!==r))} style={{ color: 'var(--red)', fontSize: 18, lineHeight: 1, padding: '0 2px' }}>×</button>
+            </div>
+          ))}
+        </div>
+      </Card>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <input style={{ ...inp, flex: 1 }} placeholder="#새 태그" value={newTag} onChange={e => setNewTag(e.target.value)} onKeyDown={e => e.key==='Enter'&&addTag()} />
           <AddBtn onClick={addTag} />
