@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Store, DEFAULT_CATS, FIREBASE_KEYS } from './utils/helpers';
+import { Store, DEFAULT_CATS, FIREBASE_KEYS, DEFAULT_DISCOUNT_REASONS } from './utils/helpers';
 import { db } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import TodoTab    from './tabs/TodoTab';
@@ -36,7 +36,8 @@ export default function App() {
   const [diaryData,  setDiaryData]  = useState({});
   const [essItems,   setEssItems]   = useState([]);
   const [cats,       setCats]       = useState(DEFAULT_CATS);
-  const [gTags,      setGTags]      = useState(['#사치','#스트레스','#건강','#필수']);
+  const [gTags, setGTags] = useState(['#사치','#스트레스','#건강','#필수']);
+  const [discReasons, setDiscReasons] = useState(DEFAULT_DISCOUNT_REASONS);
 
 const USER_ID = 'subin'; 
 
