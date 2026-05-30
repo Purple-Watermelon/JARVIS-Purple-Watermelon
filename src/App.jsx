@@ -45,15 +45,16 @@ const USER_ID = 'subin';
   useEffect(() => {
     const load = async () => {
       try {
-        const keys = ['todo','ledger','diary','ess','cats','tags'];
+        const keys = ['todo','ledger','diary','ess','cats','tags','discReasons'];
         const docs = await Promise.all(keys.map(k => getDoc(doc(db, k, USER_ID))));
-        const [td, ld, dd, ed, cd, tgs] = docs.map(d => d.exists() ? d.data().value : null);
+        const [td, ld, dd, ed, cd, tgs, dr] = docs.map(d => d.exists() ? d.data().value : null);
         if (td)  setTodoData(td);
         if (ld)  setLedgerData(ld);
         if (dd)  setDiaryData(dd);
         if (ed)  setEssItems(ed);
         if (cd)  setCats(cd);
         if (tgs) setGTags(tgs);
+        if (dr)  setDiscReasons(dr);
       } catch(e) { console.error('Firebase load error:', e); }
       setReady(true);
     };
@@ -70,7 +71,7 @@ const USER_ID = 'subin';
   useEffect(() => { if (ready) save('diary',  diaryData);  }, [diaryData,  ready]);
   useEffect(() => { if (ready) save('ess',    essItems);   }, [essItems,   ready]);
   useEffect(() => { if (ready) save('cats',   cats);       }, [cats,       ready]);
-  useEffect(() => { if (ready) save('tags',   gTags);      }, [gTags,      ready]);
+  useEffect(() => { if (ready) save('discReasons', discReasons); }, [discReasons, ready]);
 
   if (!ready) return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100vh', background:'var(--bg)' }}>
