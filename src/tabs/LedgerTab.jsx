@@ -119,8 +119,15 @@ export default function LedgerTab({ data, setData, cats, gTags, setGTags, essIte
 
   // ── Stats ──────────────────────────────────────────────────────────────
   const expEntries = monthEntries.filter(e => !e.isSaving);
+  const totalDisc = monthEntries.reduce((s, e) => s + (e.discAmt||0), 0);
   const byCat = Object.entries(
     expEntries.reduce((acc, e) => { acc[e.cat] = (acc[e.cat]||0) + e.amount; return acc; }, {})
+  ).sort((a, b) => b[1] - a[1]);
+  const discByCat = Object.entries(
+    monthEntries.filter(e => e.discAmt > 0).reduce((acc, e) => { acc[e.cat] = (acc[e.cat]||0) + (e.discAmt||0); return acc; }, {})
+  ).sort((a, b) => b[1] - a[1]);
+  const discByReason = Object.entries(
+    monthEntries.filter(e => e.discAmt > 0).reduce((acc, e) => { const r = e.discReason||'기타'; acc[r] = (acc[r]||0) + (e.discAmt||0); return acc; }, {})
   ).sort((a, b) => b[1] - a[1]);
   const bySub = Object.entries(
     expEntries.reduce((acc, e) => { acc[e.sub||e.cat] = (acc[e.sub||e.cat]||0) + e.amount; return acc; }, {})
@@ -268,7 +275,34 @@ export default function LedgerTab({ data, setData, cats, gTags, setGTags, essIte
               </Card>
             )}
 
-            {!monthEntries.length && <div style={{ textAlign: 'center', color: 'var(--sub)', padding: '40px 0' }}>이달 데이터 없음</div>}
+            {totalDisc > 0 && (
+              <Card style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>🏷️ 할인 통계</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--green)', marginBottom: 12 }}>총 {fmtAmount(totalDisc)}원 절약!</div>
+                {discByCat.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 600, marginBottom: 8 }}>카테고리별</div>
+                    {discByCat.map(([cat, amt]) => (
+                      <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                        <span>{cat}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--green)' }}>-{fmtAmount(amt)}원</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {discByReason.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 600, marginBottom: 8 }}>할인 이유별</div>
+                    {discByReason.map(([reason, amt]) => (
+                      <div key={reason} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                        <span>{reason}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--green)' }}>-{fmtAmount(amt)}원</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
           </>
         )}
 
