@@ -19,8 +19,6 @@ export default function LedgerTab({ data, setData, cats, gTags, setGTags, essIte
   const [aiLoading, setAiLoading] = useState(false);
   const [selectedCat, setSelectedCat] = useState(null);
   const [selectedSub, setSelectedSub] = useState(null);
-  const [selectedCat, setSelectedCat] = useState(null);
-  const [selectedSub, setSelectedSub] = useState(null);
 
   const entries = data || [];
   const F = (k, v) => setForm(p => ({ ...p, [k]: v }));
