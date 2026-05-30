@@ -6,7 +6,7 @@ export function Card({ children, style = {} }) {
   return (
     <div style={{
       background: 'var(--card)', borderRadius: 16,
-      padding: 16, boxShadow: '0 2px 12px rgba(124,92,191,0.08)',
+      padding: 16, border: '1.5px solid var(--border)', boxShadow: 'none',
       ...style
     }}>
       {children}
