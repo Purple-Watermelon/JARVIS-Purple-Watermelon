@@ -11,6 +11,15 @@ export const Store = {
   },
 };
 
+export const FIREBASE_KEYS = {
+  todo:   'todo',
+  ledger: 'ledger',
+  diary:  'diary',
+  ess:    'essentials',
+  cats:   'categories',
+  tags:   'tags',
+};
+
 // ── Date helpers ───────────────────────────────────────────────────────
 export const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
