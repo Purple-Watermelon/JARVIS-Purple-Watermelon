@@ -74,7 +74,7 @@ export default function App() {
 
       {/* Top bar */}
       <div style={{ position:'sticky', top:0, zIndex:100, background:'var(--card)', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', height:57 }}>
-        <span style={{ fontWeight:800, fontSize:18, color:'var(--accent)', letterSpacing:-0.5 }}>JARVIS <span style={{ fontWeight:400, fontSize:14 }}>Purple</span></span>
+        <span style={{ fontWeight:800, fontSize:18, color:'var(--accent)', letterSpacing:-0.5 }}>🍉💜 JARVIS <span style={{ fontWeight:400, fontSize:14 }}>Purple Watermelon</span></span>
         <span style={{ fontSize:12, color:'var(--sub)' }}>{new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'})}</span>
       </div>
 
