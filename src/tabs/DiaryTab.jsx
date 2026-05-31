@@ -102,11 +102,6 @@ export default function DiaryTab({ data, setData, unlocked, setUnlocked }) {
     const updated = { ...(entry||{date:key}), photos: [...((entry||{}).photos||[]), ...newPhotos] };
     setData(p => ({ ...p, [key]: updated }));
   };
-    Promise.all(readers).then(newPhotos => {
-      const updated = { ...(entry||{date:key}), photos: [...((entry||{}).photos||[]), ...newPhotos] };
-      setData(p => ({ ...p, [key]: updated }));
-    });
-  };
 
   const updatePhotoComment = (photoId, comment) => {
     const updated = { ...entry, photos: (entry.photos||[]).map(p=>p.id===photoId?{...p,comment}:p) };
