@@ -2,7 +2,7 @@
   "name": "jarvis-purple",
   "version": "1.0.0",
   "private": true,
-  "homepage": "https://purple-watermelon.github.io/JARVIS-Purple",
+  "homepage": "https://purple-watermelon.github.io/JARVIS-Purple-Watermelon",
   "dependencies": {
     "ajv": "^8.20.0",
     "ajv-keywords": "^5.1.0",
