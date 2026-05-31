@@ -1,12 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@300;400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap');
+
 :root {
-  --bg: #ffffff;
-  --card: #f8f8f8;
-  --text: #1a1428;
-  --sub: #7a6f8a;
-  --border: #eeeeee;
-  --accent: #7c5cbf;
-  --accent2: #a67fd4;
-  --accent-bg: rgba(124, 92, 191, 0.08);
+  --bg: #f5f0ff;
+  --card: #ffffff;
+  --text: #2d1b69;
+  --sub: #9b89c4;
+  --border: #e8dff8;
+  --accent: #9b6ddd;
+  --accent2: #c4a7f0;
+  --accent-bg: rgba(155, 109, 221, 0.1);
+  --lilac: #b39ddb;
+  --lilac-light: #ede7f6;
+  --pig: #ffb3c6;
+  --pig-light: #fff0f5;
   --red: #e05252;
   --red-bg: rgba(224, 82, 82, 0.1);
   --green: #3dbf6c;
@@ -14,6 +20,7 @@
   --yellow: #e8a838;
   --yellow-bg: rgba(232, 168, 56, 0.1);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --font-hand: 'Gaegu', cursive;
 }
 
 * {
@@ -24,7 +31,8 @@
 }
 
 body {
-  font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  ffont-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  background: var(--bg)
   background: #e8e0f5;
   color: var(--text);
   overflow-x: hidden;
