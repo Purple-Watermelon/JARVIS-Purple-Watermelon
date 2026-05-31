@@ -85,7 +85,7 @@ const USER_ID = 'subin';
   );
 
   return (
-    <div style={{ fontFamily:"'Noto Sans KR','Apple SD Gothic Neo',sans-serif", maxWidth:480, margin:'0 auto', minHeight:'100vh', background:'var(--bg)', color:'var(--text)', position:'relative' }}>
+    <div style={{ fontFamily:"'Noto Sans KR','Apple SD Gothic Neo',sans-serif", maxWidth:480, margin:'0 auto', minHeight:'100vh', background:'var(--bg)', color:'var(--text)', position:'relative', boxShadow:'0 0 40px rgba(124,92,191,0.15)' }}>
 
       {/* Top bar */}
       <div style={{ position:'sticky', top:0, zIndex:100, background:'var(--card)', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', height:57 }}>
