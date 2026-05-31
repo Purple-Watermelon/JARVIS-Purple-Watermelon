@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/JARVIS-Purple-Watermelon/static/css/main.834ee90e.css",
-    "main.js": "/JARVIS-Purple-Watermelon/static/js/main.71e409c4.js",
+    "main.css": "/JARVIS-Purple-Watermelon/static/css/main.acdd8cf3.css",
+    "main.js": "/JARVIS-Purple-Watermelon/static/js/main.08aa67fc.js",
     "index.html": "/JARVIS-Purple-Watermelon/index.html",
-    "main.834ee90e.css.map": "/JARVIS-Purple-Watermelon/static/css/main.834ee90e.css.map",
-    "main.71e409c4.js.map": "/JARVIS-Purple-Watermelon/static/js/main.71e409c4.js.map"
+    "main.acdd8cf3.css.map": "/JARVIS-Purple-Watermelon/static/css/main.acdd8cf3.css.map",
+    "main.08aa67fc.js.map": "/JARVIS-Purple-Watermelon/static/js/main.08aa67fc.js.map"
   },
   "entrypoints": [
-    "static/css/main.834ee90e.css",
-    "static/js/main.71e409c4.js"
+    "static/css/main.acdd8cf3.css",
+    "static/js/main.08aa67fc.js"
   ]
 }
