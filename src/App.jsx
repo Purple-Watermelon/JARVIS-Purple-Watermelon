@@ -3,7 +3,6 @@ import { Store, DEFAULT_CATS, FIREBASE_KEYS, DEFAULT_DISCOUNT_REASONS } from './
 import { db } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import TodoTab    from './tabs/TodoTab';
-import FloatingTodo from './components/FloatingTodo';
 import LedgerTab  from './tabs/LedgerTab';
 import DiaryTab   from './tabs/DiaryTab';
 import CycleTab   from './tabs/CycleTab';
@@ -95,7 +94,7 @@ const USER_ID = 'subin';
 
       {/* Content */}
       <div style={{ paddingBottom: 70 }}>
-        {tab === 'todo'     && <TodoTab     data={todoData}   setData={setTodoData}   essItems={essItems} />}
+        {{tab === 'todo'     && <TodoTab     data={todoData}   setData={setTodoData}   essItems={essItems} setEssItems={setEssItems} />}
         {tab === 'ledger'   && <LedgerTab   data={ledgerData} setData={setLedgerData} cats={cats} gTags={gTags} setGTags={setGTags} essItems={essItems} setEssItems={setEssItems} discReasons={discReasons} setDiscReasons={setDiscReasons} />}
         {tab === 'diary'    && <DiaryTab    data={diaryData}  setData={setDiaryData}  unlocked={diaryUnlocked} setUnlocked={setDiaryUnlocked} />}
         {tab === 'cycle'    && <CycleTab    data={essItems}   setData={setEssItems} />}
@@ -103,8 +102,6 @@ const USER_ID = 'subin';
         {tab === 'settings' && <SettingsTab cats={cats} setCats={setCats} gTags={gTags} setGTags={setGTags} discReasons={discReasons} setDiscReasons={setDiscReasons} />}
       </div>
 
-      {/* PC 플로팅 할일 위젯 */}
-      <FloatingTodo todoData={todoData} setTodoData={setTodoData} />
       <div style={{
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
         width: '100%', maxWidth: 480,
