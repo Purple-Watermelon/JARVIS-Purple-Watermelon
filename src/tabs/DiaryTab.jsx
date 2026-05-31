@@ -82,12 +82,26 @@ export default function DiaryTab({ data, setData, unlocked, setUnlocked }) {
     setData(p => ({ ...p, [key]: updated }));
   };
 
-  const addPhotos = (files) => {
-    const readers = Array.from(files).map(file => new Promise(resolve => {
-      const r = new FileReader();
-      r.onload = e => resolve({ id: uid(), src: e.target.result, comment: '' });
-      r.readAsDataURL(file);
+  const uploadToCloudinary = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    return data.secure_url;
+  };
+
+  const addPhotos = async (files) => {
+    const newPhotos = await Promise.all(Array.from(files).map(async file => {
+      const url = await uploadToCloudinary(file);
+      return { id: uid(), src: url, comment: '' };
     }));
+    const updated = { ...(entry||{date:key}), photos: [...((entry||{}).photos||[]), ...newPhotos] };
+    setData(p => ({ ...p, [key]: updated }));
+  };
     Promise.all(readers).then(newPhotos => {
       const updated = { ...(entry||{date:key}), photos: [...((entry||{}).photos||[]), ...newPhotos] };
       setData(p => ({ ...p, [key]: updated }));
