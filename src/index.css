@@ -31,8 +31,8 @@
 }
 
 body {
-  ffont-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
-  background: var(--bg)
+  font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  background: var(--bg);
   background: #e8e0f5;
   color: var(--text);
   overflow-x: hidden;
