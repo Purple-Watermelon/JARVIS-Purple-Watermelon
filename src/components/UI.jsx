@@ -267,31 +267,7 @@ export function DonutChart({ data, size = 160, showLabels = false, centerLabel =
     </svg>
   );
 }
-  const total = data.reduce((s, d) => s + d.value, 0);
-  if (!total) return null;
-  const r = 50, cx = 60, cy = 60;
-  let cumAngle = -Math.PI / 2;
-  const slices = data.map(d => {
-    const angle = (d.value / total) * 2 * Math.PI;
-    const x1 = cx + r * Math.cos(cumAngle);
-    const y1 = cy + r * Math.sin(cumAngle);
-    cumAngle += angle;
-    const x2 = cx + r * Math.cos(cumAngle);
-    const y2 = cy + r * Math.sin(cumAngle);
-    const large = angle > Math.PI ? 1 : 0;
-    const path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
-    return { ...d, path };
-  });
 
-  return (
-    <svg viewBox="0 0 120 120" width={size} height={size}>
-      {slices.map((s, i) => (
-        <path key={i} d={s.path} fill={s.color} opacity={0.85} />
-      ))}
-      <circle cx={cx} cy={cy} r={28} fill="var(--card)" />
-    </svg>
-  );
-}
 
 // ── PIN Lock Overlay ───────────────────────────────────────────────────
 export function PinLock({ onUnlock }) {
