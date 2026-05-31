@@ -94,7 +94,7 @@ const USER_ID = 'subin';
 
       {/* Content */}
       <div style={{ paddingBottom: 70 }}>
-        {{tab === 'todo'     && <TodoTab     data={todoData}   setData={setTodoData}   essItems={essItems} setEssItems={setEssItems} />}
+        {tab === 'todo'     && <TodoTab     data={todoData}   setData={setTodoData}   essItems={essItems} setEssItems={setEssItems} />}
         {tab === 'ledger'   && <LedgerTab   data={ledgerData} setData={setLedgerData} cats={cats} gTags={gTags} setGTags={setGTags} essItems={essItems} setEssItems={setEssItems} discReasons={discReasons} setDiscReasons={setDiscReasons} />}
         {tab === 'diary'    && <DiaryTab    data={diaryData}  setData={setDiaryData}  unlocked={diaryUnlocked} setUnlocked={setDiaryUnlocked} />}
         {tab === 'cycle'    && <CycleTab    data={essItems}   setData={setEssItems} />}
