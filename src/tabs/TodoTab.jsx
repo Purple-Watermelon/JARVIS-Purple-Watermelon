@@ -1,12 +1,27 @@
 import { useState, useMemo } from 'react';
-import { uid, fmtDate, toKey, addDays, Store } from '../utils/helpers';
+import { uid, fmtDate, toKey } from '../utils/helpers';
 import { Card, Modal, CalendarOverlay, SaveBtn, AddRowBtn, SectionHeader } from '../components/UI';
 
 const PC = { 높음: '#e05252', 중간: '#e8a838', 낮음: '#52ae7a' };
 const lbl = { fontSize: 11, color: 'var(--sub)', display: 'block', marginBottom: 5, fontWeight: 600 };
-const inp = { width: '100%', border: '1.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: 'var(--card)', color: 'var(--text)', outline: 'none', WebkitAppearance: 'none' };
+const inp = { width: '100%', border: '1.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: 'var(--card)', color: 'var(--text)', outline: 'none', WebkitAppearance: 'none', boxSizing: 'border-box' };
 
-function WishRow({ w, onEdit, onDel, onBuy }) {
+// order 필드로 정렬 (order 없으면 뒤로). 같으면 기존 순서 유지
+const byOrder = (a, b) => (a.order ?? 9999) - (b.order ?? 9999);
+
+// ── 이동/수정/삭제 액션 바 (펼침) ────────────────────────────────────────
+function ActionBar({ onEdit, onUp, onDown, onDel, canUp, canDown }) {
+  return (
+    <div style={{ display: 'flex', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
+      <button onClick={e => { e.stopPropagation(); onEdit(); }} style={{ flex: 1, padding: '10px 0', fontSize: 12, color: 'var(--accent)', fontWeight: 700, borderRight: '1px solid var(--border)', background: 'none', cursor: 'pointer' }}>✎ 수정</button>
+      <button onClick={e => { e.stopPropagation(); onUp(); }} disabled={!canUp} style={{ flex: 1, padding: '10px 0', fontSize: 13, color: canUp ? 'var(--text)' : 'var(--border)', fontWeight: 700, borderRight: '1px solid var(--border)', background: 'none', cursor: canUp ? 'pointer' : 'default' }}>↑</button>
+      <button onClick={e => { e.stopPropagation(); onDown(); }} disabled={!canDown} style={{ flex: 1, padding: '10px 0', fontSize: 13, color: canDown ? 'var(--text)' : 'var(--border)', fontWeight: 700, borderRight: '1px solid var(--border)', background: 'none', cursor: canDown ? 'pointer' : 'default' }}>↓</button>
+      <button onClick={e => { e.stopPropagation(); onDel(); }} style={{ flex: 1, padding: '10px 0', fontSize: 12, color: 'var(--red)', fontWeight: 700, background: 'none', cursor: 'pointer' }}>🗑 삭제</button>
+    </div>
+  );
+}
+
+function WishRow({ w, onEdit, onDel, onBuy, onUp, onDown, canUp, canDown }) {
   const [open, setOpen] = useState(false);
   const bought = !!w.boughtDate;
   return (
@@ -30,56 +45,77 @@ function WishRow({ w, onEdit, onDel, onBuy }) {
         </button>
       </div>
       {open && (
-        <div style={{ display: 'flex', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
-          <button onClick={() => { onEdit(); setOpen(false); }} style={{ flex: 1, padding: '10px 0', fontSize: 12, color: 'var(--accent)', fontWeight: 700, borderRight: '1px solid var(--border)' }}>✎ 수정</button>
-          <button onClick={onDel} style={{ flex: 1, padding: '10px 0', fontSize: 12, color: 'var(--red)', fontWeight: 700 }}>🗑 삭제</button>
-        </div>
+        <ActionBar
+          onEdit={() => { onEdit(); setOpen(false); }}
+          onUp={onUp} onDown={onDown} onDel={onDel}
+          canUp={canUp} canDown={canDown}
+        />
       )}
     </div>
   );
 }
 
-export default function TodoTab({ data, setData, essItems }) {
+export default function TodoTab({ data, setData, essItems, setEssItems }) {
   const today = new Date();
   const [date, setDate] = useState(today);
   const [showCal, setShowCal] = useState(false);
-  const [modal, setModal] = useState(null); // 'routine'|'work'|'daily'|'wish'
+  const [modal, setModal] = useState(null);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({});
+  const [openEssId, setOpenEssId] = useState(null); // 구매임박 항목 펼침
 
   const { y, m, day, dow, key } = fmtDate(date);
   const isToday = key === toKey(today);
 
-  // Data accessors
   const routines  = data.routines  || [];
   const work      = data.work      || {};
   const daily     = data.daily     || {};
   const wish      = data.wish      || [];
-  const completed = data.completed || {}; // { [key]: { [id]: true } }
+  const completed = data.completed || {};
 
-  const todayWork  = useMemo(() => {
+  // ── 표시용 목록 (order 정렬) ────────────────────────────────────────────
+  const visRoutines = useMemo(
+    () => routines.filter(r => r.addedDate <= key && !(r.removed && r.removed[key])).sort(byOrder),
+    [routines, key]
+  );
+
+  const todayWork = useMemo(() => {
     const all = Object.values(work).flat();
     return all.filter(t => t.startDate <= key && (!t.removed || !t.removed[key]));
   }, [work, key]);
 
-  const todayDaily = (daily[key] || []);
-  const todayWish  = wish.filter(w => !w.boughtDate || w.boughtDate === key);
+  const todayDaily = useMemo(() => (daily[key] || []).slice().sort(byOrder), [daily, key]);
 
-  // Urgent essentials to show at bottom of daily section
-  const urgentEss = essItems.filter(e => {
+  const todayWish = useMemo(
+    () => wish.filter(w => !w.boughtDate || w.boughtDate === key).slice().sort(byOrder),
+    [wish, key]
+  );
+
+  // 회사업무: 우선순위 그룹 → 그룹 안에서 order 정렬
+  const PORDER = { 높음: 0, 중간: 1, 낮음: 2 };
+  const sortedWork = useMemo(() => {
+    return [...todayWork].sort((a, b) => {
+      const pa = PORDER[a.priority] ?? 1, pb = PORDER[b.priority] ?? 1;
+      if (pa !== pb) return pa - pb;            // 우선순위 먼저
+      return (a.order ?? 9999) - (b.order ?? 9999); // 같은 우선순위 안에서 order
+    });
+  }, [todayWork]);
+
+  // 구매임박 생필품 (알림 꺼진 건 제외)
+  const urgentEss = useMemo(() => (essItems || []).filter(e => {
+    if (e.notifyOff) return false;             // 🔕 알림 꺼진 항목 제외
     const h = e.history || [];
     if (h.length < 2) return false;
-    const sorted = [...h].sort((a, b) => new Date(b.date) - new Date(a.date));
-    const lastDate = new Date(sorted[0].date);
+    const sorted = [...h].sort((a, b) => new Date(a.date) - new Date(b.date));
     const gaps = [];
-    for (let i = 1; i < h.length; i++) gaps.push((new Date(sorted[i-1].date) - new Date(sorted[i].date)) / 864e5);
+    for (let i = 1; i < sorted.length; i++) gaps.push((new Date(sorted[i].date) - new Date(sorted[i-1].date)) / 864e5);
     const avg = Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length);
-    const next = new Date(lastDate); next.setDate(next.getDate() + avg);
-    const diff = Math.ceil((next - new Date()) / 864e5);
+    const last = new Date(sorted[sorted.length-1].date); last.setDate(last.getDate() + avg);
+    const diff = Math.ceil((last - new Date()) / 864e5);
     return diff <= 10;
-  });
+  }), [essItems]);
 
-  // Completion helpers
+  // ── 완료 토글 ────────────────────────────────────────────────────────────
   const isDone = id => !!(completed[key] && completed[key][id]);
   const toggle = id => {
     setData(p => {
@@ -91,30 +127,25 @@ export default function TodoTab({ data, setData, essItems }) {
     });
   };
 
-  // Progress
-  const allIds = [
-    ...routines.filter(r => r.addedDate <= key && !(r.removed && r.removed[key])).map(r => r.id),
-    ...todayWork.map(t => t.id),
-    ...todayDaily.map(t => t.id),
-  ];
+  // ── 진행률 ────────────────────────────────────────────────────────────────
+  const allIds = [...visRoutines.map(r=>r.id), ...sortedWork.map(t=>t.id), ...todayDaily.map(t=>t.id)];
   const doneCount = allIds.filter(id => isDone(id)).length;
   const progress = allIds.length ? Math.round((doneCount / allIds.length) * 100) : 0;
 
-  // Form helpers
+  // ── 폼 ────────────────────────────────────────────────────────────────────
   const F = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const openModal = (type, item = null) => {
-    setModal(type); setEditItem(item);
-    setForm(item ? { ...item } : {});
-  };
+  const openModal = (type, item = null) => { setModal(type); setEditItem(item); setForm(item ? { ...item } : {}); };
   const closeModal = () => { setModal(null); setEditItem(null); setForm({}); };
 
-  // Save handlers
+  // 새 항목 추가 시 order = 현재 목록 최대 +1
+  const nextOrder = (list) => (list.length ? Math.max(...list.map(x => x.order ?? 0)) + 1 : 0);
+
   const saveRoutine = () => {
     if (!form.title?.trim()) return;
     setData(p => {
       const list = p.routines || [];
       if (editItem) return { ...p, routines: list.map(r => r.id === editItem.id ? { ...r, ...form } : r) };
-      return { ...p, routines: [...list, { id: uid(), title: form.title.trim(), addedDate: key }] };
+      return { ...p, routines: [...list, { id: uid(), title: form.title.trim(), addedDate: key, order: nextOrder(list) }] };
     });
     closeModal();
   };
@@ -124,14 +155,11 @@ export default function TodoTab({ data, setData, essItems }) {
     setData(p => {
       const w = { ...p.work };
       if (editItem) {
-        // Remove from old startDate bucket, add to new
         Object.keys(w).forEach(dk => { w[dk] = (w[dk] || []).filter(t => t.id !== editItem.id); });
-        const id = editItem.id;
-        const updated = { id, ...form, title: form.title.trim() };
-        w[form.startDate] = [...(w[form.startDate] || []), updated];
+        w[form.startDate] = [...(w[form.startDate] || []), { id: editItem.id, ...form, title: form.title.trim() }];
       } else {
-        const t = { id: uid(), ...form, title: form.title.trim() };
-        w[form.startDate] = [...(w[form.startDate] || []), t];
+        const bucket = w[form.startDate] || [];
+        w[form.startDate] = [...bucket, { id: uid(), ...form, title: form.title.trim(), order: nextOrder(bucket) }];
       }
       return { ...p, work: w };
     });
@@ -145,7 +173,8 @@ export default function TodoTab({ data, setData, essItems }) {
       if (editItem) {
         d[key] = (d[key] || []).map(t => t.id === editItem.id ? { ...t, ...form, title: form.title.trim() } : t);
       } else {
-        d[key] = [...(d[key] || []), { id: uid(), ...form, title: form.title.trim(), addedDate: key }];
+        const bucket = d[key] || [];
+        d[key] = [...bucket, { id: uid(), ...form, title: form.title.trim(), addedDate: key, order: nextOrder(bucket) }];
       }
       return { ...p, daily: d };
     });
@@ -157,37 +186,78 @@ export default function TodoTab({ data, setData, essItems }) {
     setData(p => {
       const list = p.wish || [];
       if (editItem) return { ...p, wish: list.map(w => w.id === editItem.id ? { ...w, ...form } : w) };
-      return { ...p, wish: [...list, { id: uid(), ...form, name: form.name.trim(), addedDate: key }] };
+      return { ...p, wish: [...list, { id: uid(), ...form, name: form.name.trim(), addedDate: key, order: nextOrder(list) }] };
     });
     closeModal();
   };
 
-  const delRoutine = id => setData(p => ({
-    ...p,
-    routines: (p.routines || []).map(r => r.id === id ? { ...r, removed: { ...(r.removed||{}), [key]: true } } : r)
-  }));
-
+  // ── 삭제 ────────────────────────────────────────────────────────────────
+  const delRoutine = id => setData(p => ({ ...p, routines: (p.routines || []).map(r => r.id === id ? { ...r, removed: { ...(r.removed||{}), [key]: true } } : r) }));
   const delWork = (id, startDate) => setData(p => {
     const w = { ...p.work };
     w[startDate] = (w[startDate] || []).map(t => t.id === id ? { ...t, removed: { ...(t.removed||{}), [key]: true } } : t);
     return { ...p, work: w };
   });
-
-  const delDaily = id => setData(p => {
-    const d = { ...p.daily };
-    d[key] = (d[key] || []).filter(t => t.id !== id);
-    return { ...p, daily: d };
-  });
-
+  const delDaily = id => setData(p => { const d = { ...p.daily }; d[key] = (d[key] || []).filter(t => t.id !== id); return { ...p, daily: d }; });
   const delWish = id => setData(p => ({ ...p, wish: (p.wish || []).filter(w => w.id !== id) }));
-
   const buyWish = id => setData(p => ({ ...p, wish: (p.wish || []).map(w => w.id === id ? { ...w, boughtDate: key } : w) }));
 
-  // Sort work by priority
-  const PORDER = { 높음: 0, 중간: 1, 낮음: 2 };
-  const sortedWork = [...todayWork].sort((a, b) => (PORDER[a.priority]||1) - (PORDER[b.priority]||1));
+  // ── 순서 이동 (order 맞바꾸기) ────────────────────────────────────────────
+  // visibleList: 화면에 보이는 정렬된 목록, idx: 움직일 항목 위치, dir: -1(위)/+1(아래)
+  const swapOrder = (visibleList, idx, dir, applyNewList) => {
+    const target = idx + dir;
+    if (target < 0 || target >= visibleList.length) return;
+    const a = visibleList[idx], b = visibleList[target];
+    const ao = a.order ?? idx, bo = b.order ?? target;
+    applyNewList(a.id, bo, b.id, ao); // a는 b의 order로, b는 a의 order로
+  };
 
-  const TaskRow = ({ item, onToggle, onEdit, onDel, extra }) => {
+  const moveRoutine = (idx, dir) => swapOrder(visRoutines, idx, dir, (aId, aNew, bId, bNew) => {
+    setData(p => ({ ...p, routines: (p.routines||[]).map(r => r.id===aId?{...r,order:aNew}:r.id===bId?{...r,order:bNew}:r) }));
+  });
+
+  const moveDaily = (idx, dir) => swapOrder(todayDaily, idx, dir, (aId, aNew, bId, bNew) => {
+    setData(p => { const d={...p.daily}; d[key]=(d[key]||[]).map(t=>t.id===aId?{...t,order:aNew}:t.id===bId?{...t,order:bNew}:t); return {...p,daily:d}; });
+  });
+
+  const moveWish = (idx, dir) => swapOrder(todayWish, idx, dir, (aId, aNew, bId, bNew) => {
+    setData(p => ({ ...p, wish: (p.wish||[]).map(w => w.id===aId?{...w,order:aNew}:w.id===bId?{...w,order:bNew}:w) }));
+  });
+
+  // 회사업무: 같은 우선순위 그룹 안에서만 이동
+  const moveWork = (idx, dir) => {
+    const item = sortedWork[idx];
+    const sameGroup = sortedWork.filter(t => (t.priority||'중간') === (item.priority||'중간'));
+    const gIdx = sameGroup.findIndex(t => t.id === item.id);
+    const target = gIdx + dir;
+    if (target < 0 || target >= sameGroup.length) return;
+    const a = sameGroup[gIdx], b = sameGroup[target];
+    const ao = a.order ?? gIdx, bo = b.order ?? target;
+    setData(p => {
+      const w = { ...p.work };
+      Object.keys(w).forEach(dk => {
+        w[dk] = (w[dk]||[]).map(t => t.id===a.id?{...t,order:bo}:t.id===b.id?{...t,order:ao}:t);
+      });
+      return { ...p, work: w };
+    });
+  };
+
+  // 회사업무 이동 가능 여부 (그룹 안에서)
+  const workMoveable = (idx) => {
+    const item = sortedWork[idx];
+    const sameGroup = sortedWork.filter(t => (t.priority||'중간') === (item.priority||'중간'));
+    const gIdx = sameGroup.findIndex(t => t.id === item.id);
+    return { canUp: gIdx > 0, canDown: gIdx < sameGroup.length - 1 };
+  };
+
+  // ── 생필품 알림 끄기 (주기 탭과 연동) ──────────────────────────────────────
+  const muteEss = (id) => {
+    setEssItems(p => (p || []).map(e => e.id === id ? { ...e, notifyOff: true } : e));
+    setOpenEssId(null);
+  };
+
+  // ── 할일 행 ────────────────────────────────────────────────────────────────
+  const TaskRow = ({ item, onToggle, onEdit, onDel, onUp, onDown, canUp, canDown, extra }) => {
     const [open, setOpen] = useState(false);
     const done = isDone(item.id);
     return (
@@ -209,10 +279,11 @@ export default function TodoTab({ data, setData, essItems }) {
           </button>
         </div>
         {open && (
-          <div style={{ display: 'flex', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
-            <button onClick={e => { e.stopPropagation(); onEdit(); setOpen(false); }} style={{ flex: 1, padding: '10px 0', fontSize: 12, color: 'var(--accent)', fontWeight: 700, borderRight: '1px solid var(--border)' }}>✎ 수정</button>
-            <button onClick={e => { e.stopPropagation(); onDel(); }} style={{ flex: 1, padding: '10px 0', fontSize: 12, color: 'var(--red)', fontWeight: 700 }}>🗑 삭제</button>
-          </div>
+          <ActionBar
+            onEdit={() => { onEdit(); setOpen(false); }}
+            onUp={onUp} onDown={onDown} onDel={onDel}
+            canUp={canUp} canDown={canDown}
+          />
         )}
       </div>
     );
@@ -220,17 +291,17 @@ export default function TodoTab({ data, setData, essItems }) {
 
   return (
     <div style={{ padding: 16, paddingBottom: 90 }}>
-      {/* Date Header */}
+      {/* 날짜 헤더 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <button onClick={() => setDate(d => { const n = new Date(d); n.setDate(n.getDate()-1); return n; })} style={{ fontSize: 26, color: 'var(--accent)', padding: '2px 8px' }}>‹</button>
-        <button onClick={() => setShowCal(true)} style={{ textAlign: 'center', flex: 1 }}>
+        <button onClick={() => setDate(d => { const n = new Date(d); n.setDate(n.getDate()-1); return n; })} style={{ fontSize: 26, color: 'var(--accent)', padding: '2px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>‹</button>
+        <button onClick={() => setShowCal(true)} style={{ textAlign: 'center', flex: 1, background: 'none', border: 'none', cursor: 'pointer' }}>
           <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{m}월 {day}일</div>
           <div style={{ fontSize: 14, color: 'var(--accent)', fontWeight: 600, marginTop: 2 }}>{y} {dow}요일 {isToday ? '· 오늘' : ''}</div>
         </button>
-        <button onClick={() => setDate(d => { const n = new Date(d); n.setDate(n.getDate()+1); return n; })} style={{ fontSize: 26, color: 'var(--accent)', padding: '2px 8px' }}>›</button>
+        <button onClick={() => setDate(d => { const n = new Date(d); n.setDate(n.getDate()+1); return n; })} style={{ fontSize: 26, color: 'var(--accent)', padding: '2px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>›</button>
       </div>
 
-      {/* Progress Bar */}
+      {/* 진행률 */}
       {allIds.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--sub)', marginBottom: 5 }}>
@@ -243,61 +314,74 @@ export default function TodoTab({ data, setData, essItems }) {
         </div>
       )}
 
-      {/* Section 1: 루틴 */}
+      {/* 루틴 */}
       <div style={{ marginBottom: 20 }}>
-        <SectionHeader icon="🔄" title="루틴" color="var(--accent)" count={routines.filter(r => r.addedDate <= key && !(r.removed && r.removed[key])).length} />
+        <SectionHeader icon="🔄" title="루틴" color="var(--accent)" count={visRoutines.length} />
         <div style={{ background: 'var(--card)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 2px 10px rgba(124,92,191,0.08)', border: '1px solid var(--border)' }}>
-          {routines.filter(r => r.addedDate <= key && !(r.removed && r.removed[key])).map(r => (
-            <TaskRow key={r.id} item={r} onToggle={() => toggle(r.id)} onEdit={() => openModal('routine', r)} onDel={() => delRoutine(r.id)} />
+          {visRoutines.map((r, i) => (
+            <TaskRow key={r.id} item={r} onToggle={() => toggle(r.id)} onEdit={() => openModal('routine', r)} onDel={() => delRoutine(r.id)}
+              onUp={() => moveRoutine(i, -1)} onDown={() => moveRoutine(i, +1)} canUp={i>0} canDown={i<visRoutines.length-1} />
           ))}
           <AddRowBtn onClick={() => openModal('routine')} />
         </div>
       </div>
 
-      {/* Section 2: 회사업무 */}
+      {/* 회사업무 */}
       <div style={{ marginBottom: 20 }}>
         <SectionHeader icon="💼" title="회사업무" color="#e8a838" count={sortedWork.length} />
         <div style={{ background: 'var(--card)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 2px 10px rgba(124,92,191,0.08)', border: '1px solid var(--border)' }}>
-          {sortedWork.map(t => (
-            <TaskRow key={t.id} item={t} onToggle={() => toggle(t.id)} onEdit={() => openModal('work', t)} onDel={() => delWork(t.id, t.startDate)}
-              extra={
-                <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                  {t.priority && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: `${PC[t.priority]}18`, color: PC[t.priority], fontWeight: 700 }}>{t.priority}</span>}
-                  {t.due && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: 'var(--bg)', color: 'var(--sub)' }}>~{t.due}</span>}
-                </div>
-              }
-            />
-          ))}
+          {sortedWork.map((t, i) => {
+            const mv = workMoveable(i);
+            return (
+              <TaskRow key={t.id} item={t} onToggle={() => toggle(t.id)} onEdit={() => openModal('work', t)} onDel={() => delWork(t.id, t.startDate)}
+                onUp={() => moveWork(i, -1)} onDown={() => moveWork(i, +1)} canUp={mv.canUp} canDown={mv.canDown}
+                extra={
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                    {t.priority && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: `${PC[t.priority]}18`, color: PC[t.priority], fontWeight: 700 }}>{t.priority}</span>}
+                    {t.due && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: 'var(--bg)', color: 'var(--sub)' }}>~{t.due}</span>}
+                  </div>
+                }
+              />
+            );
+          })}
           <AddRowBtn onClick={() => openModal('work', { startDate: key })} />
         </div>
       </div>
 
-      {/* Section 3: 일상 */}
+      {/* 일상 */}
       <div style={{ marginBottom: 20 }}>
         <SectionHeader icon="🌿" title="일상" color="#3dbf6c" count={todayDaily.length} />
         <div style={{ background: 'var(--card)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 2px 10px rgba(124,92,191,0.08)', border: '1px solid var(--border)' }}>
-          {todayDaily.map(t => (
-            <TaskRow key={t.id} item={t} onToggle={() => toggle(t.id)} onEdit={() => openModal('daily', t)} onDel={() => delDaily(t.id)} />
+          {todayDaily.map((t, i) => (
+            <TaskRow key={t.id} item={t} onToggle={() => toggle(t.id)} onEdit={() => openModal('daily', t)} onDel={() => delDaily(t.id)}
+              onUp={() => moveDaily(i, -1)} onDown={() => moveDaily(i, +1)} canUp={i>0} canDown={i<todayDaily.length-1} />
           ))}
           <AddRowBtn onClick={() => openModal('daily')} />
         </div>
 
-        {/* Urgent essentials */}
+        {/* 구매 임박 생필품 */}
         {urgentEss.length > 0 && (
           <div style={{ marginTop: 10, background: 'var(--yellow-bg)', border: '1px solid var(--yellow)', borderRadius: 12, padding: '10px 14px' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--yellow)', marginBottom: 6 }}>🛒 구매 임박 생필품</div>
             {urgentEss.map(e => {
-              const h = [...(e.history||[])].sort((a,b)=>new Date(b.date)-new Date(a.date));
               const sorted = [...(e.history||[])].sort((a,b)=>new Date(a.date)-new Date(b.date));
               const gaps = [];
               for(let i=1;i<sorted.length;i++) gaps.push((new Date(sorted[i].date)-new Date(sorted[i-1].date))/864e5);
               const avg = Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length);
-              const last = new Date(h[0].date); last.setDate(last.getDate()+avg);
+              const last = new Date(sorted[sorted.length-1].date); last.setDate(last.getDate()+avg);
               const diff = Math.ceil((last - new Date()) / 864e5);
+              const isOpen = openEssId === e.id;
               return (
-                <div key={e.id} style={{ fontSize: 12, color: 'var(--text)', display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-                  <span>{e.name}</span>
-                  <span style={{ color: diff < 0 ? 'var(--red)' : 'var(--yellow)', fontWeight: 700 }}>{diff < 0 ? `${Math.abs(diff)}일 지남 🔴` : diff === 0 ? '오늘! 🔴' : `${diff}일 후 🟡`}</span>
+                <div key={e.id}>
+                  <div onClick={() => setOpenEssId(isOpen ? null : e.id)} style={{ fontSize: 12, color: 'var(--text)', display: 'flex', justifyContent: 'space-between', padding: '5px 0', cursor: 'pointer' }}>
+                    <span>{e.name}</span>
+                    <span style={{ color: diff < 0 ? 'var(--red)' : 'var(--yellow)', fontWeight: 700 }}>{diff < 0 ? `${Math.abs(diff)}일 지남 🔴` : diff === 0 ? '오늘! 🔴' : `${diff}일 후 🟡`}</span>
+                  </div>
+                  {isOpen && (
+                    <button onClick={() => muteEss(e.id)} style={{ width: '100%', margin: '2px 0 6px', padding: '8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--sub)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                      🔕 이 생필품 알림 끄기
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -305,21 +389,22 @@ export default function TodoTab({ data, setData, essItems }) {
         )}
       </div>
 
-      {/* Section 4: 위시리스트 */}
+      {/* 위시리스트 */}
       <div style={{ marginBottom: 20 }}>
         <SectionHeader icon="🛍" title="위시리스트" color="#af52de" />
         <div style={{ background: 'var(--card)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 2px 10px rgba(124,92,191,0.08)', border: '1px solid var(--border)' }}>
-          {todayWish.map(w => (
-            <WishRow key={w.id} w={w} onEdit={() => openModal('wish', w)} onDel={() => delWish(w.id)} onBuy={() => buyWish(w.id)} />
+          {todayWish.map((w, i) => (
+            <WishRow key={w.id} w={w} onEdit={() => openModal('wish', w)} onDel={() => delWish(w.id)} onBuy={() => buyWish(w.id)}
+              onUp={() => moveWish(i, -1)} onDown={() => moveWish(i, +1)} canUp={i>0} canDown={i<todayWish.length-1} />
           ))}
           <AddRowBtn onClick={() => openModal('wish')} label="+ 위시 추가" />
         </div>
       </div>
 
-      {/* Calendar */}
+      {/* 달력 */}
       {showCal && <CalendarOverlay current={{ y, m, day }} onSelect={setDate} onClose={() => setShowCal(false)} />}
 
-      {/* Modals */}
+      {/* 모달들 */}
       {modal === 'routine' && (
         <Modal title={`🔄 루틴 ${editItem ? '수정' : '추가'}`} onClose={closeModal}>
           <div style={{ marginBottom: 14 }}><label style={lbl}>제목 *</label><input style={inp} placeholder="매일 반복할 일" value={form.title||''} onChange={e => F('title', e.target.value)} /></div>
@@ -369,7 +454,7 @@ export default function TodoTab({ data, setData, essItems }) {
                   border: `1.5px solid ${form.priority===p ? 'var(--accent)' : 'var(--border)'}`,
                   background: form.priority===p ? 'var(--accent-bg)' : 'var(--card)',
                   color: form.priority===p ? 'var(--accent)' : 'var(--sub)',
-                  fontSize: 11, fontWeight: 600,
+                  fontSize: 11, fontWeight: 600, cursor: 'pointer',
                 }}>{p}</button>
               ))}
             </div>
