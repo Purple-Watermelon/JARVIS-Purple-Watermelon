@@ -193,7 +193,80 @@ export function TimePicker({ value, onChange }) {
 }
 
 // ── Donut Chart (pure SVG) ─────────────────────────────────────────────
-export function DonutChart({ data, size = 160 }) {
+// data: [{ label, value, color }]
+// showLabels=true 면 바깥쪽에 "이름 %" 표시
+// centerLabel 있으면 가운데에 총액 등 표시
+export function DonutChart({ data, size = 160, showLabels = false, centerLabel = null, centerSub = null }) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (!total) return null;
+
+  // showLabels일 때는 바깥 글씨 공간이 필요해서 viewBox를 키움
+  const VB = showLabels ? 200 : 120;     // viewBox 크기
+  const cx = VB / 2, cy = VB / 2;        // 중심점
+  const r = showLabels ? 58 : 50;        // 도넛 반지름
+  const labelR = r + 14;                 // 라벨이 놓일 반지름(도넛 바깥)
+
+  let cumAngle = -Math.PI / 2;           // 12시 방향에서 시작
+  const slices = data.map(d => {
+    const angle = (d.value / total) * 2 * Math.PI;
+    const startA = cumAngle;
+    const x1 = cx + r * Math.cos(cumAngle);
+    const y1 = cy + r * Math.sin(cumAngle);
+    cumAngle += angle;
+    const x2 = cx + r * Math.cos(cumAngle);
+    const y2 = cy + r * Math.sin(cumAngle);
+    const large = angle > Math.PI ? 1 : 0;
+    const path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+    // 라벨 위치 = 이 조각의 중간 각도
+    const midA = startA + angle / 2;
+    const lx = cx + labelR * Math.cos(midA);
+    const ly = cy + labelR * Math.sin(midA);
+    const pct = Math.round((d.value / total) * 100);
+    return { ...d, path, lx, ly, midA, pct };
+  });
+
+  return (
+    <svg viewBox={`0 0 ${VB} ${VB}`} width={size} height={size}>
+      {/* 도넛 조각들 */}
+      {slices.map((s, i) => (
+        <path key={i} d={s.path} fill={s.color} opacity={0.88} />
+      ))}
+
+      {/* 가운데 구멍 */}
+      <circle cx={cx} cy={cy} r={showLabels ? 34 : 28} fill="var(--card)" />
+
+      {/* 가운데 글씨 (총액 등) */}
+      {centerLabel && (
+        <text x={cx} y={cy - (centerSub ? 2 : 0)} textAnchor="middle"
+          fontSize={showLabels ? 13 : 11} fontWeight="800" fill="var(--text)">
+          {centerLabel}
+        </text>
+      )}
+      {centerSub && (
+        <text x={cx} y={cy + 12} textAnchor="middle"
+          fontSize={9} fill="var(--sub)">
+          {centerSub}
+        </text>
+      )}
+
+      {/* 바깥쪽 라벨 (이름 + %) */}
+      {showLabels && slices.map((s, i) => {
+        // 라벨이 오른쪽이면 왼쪽정렬, 왼쪽이면 오른쪽정렬 (글씨가 도넛 밖으로 향하게)
+        const isRight = Math.cos(s.midA) >= 0;
+        // 너무 작은 조각(3% 미만)은 글씨 겹치니까 생략
+        if (s.pct < 3) return null;
+        return (
+          <text key={`l${i}`} x={s.lx} y={s.ly}
+            textAnchor={isRight ? 'start' : 'end'}
+            dominantBaseline="middle"
+            fontSize={8} fontWeight="600" fill="var(--text)">
+            {s.label} {s.pct}%
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
   const total = data.reduce((s, d) => s + d.value, 0);
   if (!total) return null;
   const r = 50, cx = 60, cy = 60;
