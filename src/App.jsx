@@ -7,6 +7,7 @@ import LedgerTab  from './tabs/LedgerTab';
 import DiaryTab   from './tabs/DiaryTab';
 import CycleTab   from './tabs/CycleTab';
 import SettingsTab from './tabs/SettingsTab';
+import CalendarTab from './tabs/CalendarTab';
 
 const KEYS = {
   todo:    'jarvis-todo-v1',
@@ -20,6 +21,7 @@ const KEYS = {
 const TABS = [
   { id: 'todo',    icon: '✅', label: '할일'   },
   { id: 'ledger',  icon: '💰', label: '가계부' },
+  { id: 'calendar', icon: '📅', label: '달력'   },
   { id: 'diary',   icon: '📓', label: '일기'   },
   { id: 'cycle',   icon: '🔄', label: '주기'   },
   { id: 'settings',icon: '⚙️', label: '설정'  },
@@ -96,6 +98,7 @@ const USER_ID = 'subin';
         {tab === 'ledger'   && <LedgerTab   data={ledgerData} setData={setLedgerData} cats={cats} gTags={gTags} setGTags={setGTags} essItems={essItems} setEssItems={setEssItems} discReasons={discReasons} setDiscReasons={setDiscReasons} />}
         {tab === 'diary'    && <DiaryTab    data={diaryData}  setData={setDiaryData}  unlocked={diaryUnlocked} setUnlocked={setDiaryUnlocked} />}
         {tab === 'cycle'    && <CycleTab    data={essItems}   setData={setEssItems} />}
+        {tab === 'calendar' && <CalendarTab todoData={todoData} />}
         {tab === 'settings' && <SettingsTab cats={cats} setCats={setCats} gTags={gTags} setGTags={setGTags} discReasons={discReasons} setDiscReasons={setDiscReasons} />}
       </div>
 
