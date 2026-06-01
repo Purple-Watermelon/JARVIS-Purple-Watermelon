@@ -154,7 +154,7 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
     if (!form.title?.trim() || !form.startDate) return;
     setData(p => {
       const w = { ...p.work };
-      if (editItem) {
+      if (editItem?.id) {
         Object.keys(w).forEach(dk => { w[dk] = (w[dk] || []).filter(t => t.id !== editItem.id); });
         w[form.startDate] = [...(w[form.startDate] || []), { ...form, id: editItem.id, title: form.title.trim() }];
      } else {
