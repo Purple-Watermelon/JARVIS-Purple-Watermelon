@@ -156,10 +156,10 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
       const w = { ...p.work };
       if (editItem) {
         Object.keys(w).forEach(dk => { w[dk] = (w[dk] || []).filter(t => t.id !== editItem.id); });
-        w[form.startDate] = [...(w[form.startDate] || []), { id: editItem.id, ...form, title: form.title.trim() }];
-      } else {
+        w[form.startDate] = [...(w[form.startDate] || []), { ...form, id: editItem.id, title: form.title.trim() }];
+     } else {
         const bucket = w[form.startDate] || [];
-        w[form.startDate] = [...bucket, { id: uid(), ...form, title: form.title.trim(), order: nextOrder(bucket) }];
+        w[form.startDate] = [...bucket, { ...form, id: uid(), title: form.title.trim(), order: nextOrder(bucket) }];
       }
       return { ...p, work: w };
     });
