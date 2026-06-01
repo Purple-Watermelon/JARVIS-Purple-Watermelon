@@ -344,7 +344,7 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
               />
             );
           })}
-          <AddRowBtn onClick={() => openModal('work', { startDate: key })} />
+          <AddRowBtn onClick={() => openModal('work')} />
         </div>
       </div>
 
