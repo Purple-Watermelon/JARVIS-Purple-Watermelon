@@ -1,7 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { uid, fmtDate, toKey, Store } from '../utils/helpers';
 import { CalendarOverlay, Modal, SaveBtn } from '../components/UI';
-import { DAYS } from '../utils/helpers';
 
 const EMOTIONS = [
   { emoji: '🐷❤️', label: '행복' },
@@ -16,7 +15,6 @@ export default function DiaryTab({ data, setData, unlocked, setUnlocked }) {
   const today = new Date();
   const [date, setDate] = useState(today);
   const [showCal, setShowCal] = useState(false);
-  const [editEntry, setEditEntry] = useState(null);
   const [viewPhoto, setViewPhoto] = useState(null);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
@@ -24,14 +22,32 @@ export default function DiaryTab({ data, setData, unlocked, setUnlocked }) {
   const [newPin, setNewPin] = useState('');
   const [newPinConfirm, setNewPinConfirm] = useState('');
   const [uploading, setUploading] = useState(false);
+  const fileRef = useRef();
 
   const { y, m, day, dow, key } = fmtDate(date);
   const entries = data || {};
-  const entry = entries[key] || null;
+  const savedEntry = entries[key] || null;
 
   const savedPin = Store.get('jarvis-pin');
 
-  // ── PIN Lock ───────────────────────────────────────────────────────────
+  // ── 편집용 임시 상태 (저장 버튼 누를 때까지 DB에 안 들어감) ──────────────
+  // photos 각 항목: { id, comment, src?(기존 업로드된 사진) , file?(아직 안 올린 새 사진), preview?(미리보기 URL) }
+  const [draft, setDraft] = useState({ title: '', emotion: '', text: '', photos: [] });
+
+  // 날짜가 바뀌거나 저장된 데이터가 바뀌면, 편집 내용을 그 날짜 기준으로 새로 불러옴
+  useEffect(() => {
+    const e = entries[key] || null;
+    setDraft({
+      title:   e?.title   || '',
+      emotion: e?.emotion || '',
+      text:    e?.text    || '',
+      // 기존 사진은 src를 그대로 가져옴 (이미 업로드됨)
+      photos: (e?.photos || []).map(p => ({ id: p.id, src: p.src, comment: p.comment || '' })),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, savedEntry]);
+
+  // ── PIN 잠금 ───────────────────────────────────────────────────────────
   const tapPin = d => {
     if (pin.length >= 4) return;
     const next = pin + d;
@@ -70,31 +86,10 @@ export default function DiaryTab({ data, setData, unlocked, setUnlocked }) {
     );
   }
 
-  // ── Diary content ──────────────────────────────────────────────────────
-  const saveEntry = (updated) => {
-    setData(p => ({ ...p, [key]: updated }));
-    setEditEntry(null);
-  };
+  // ── 입력 헬퍼 ────────────────────────────────────────────────────────────
+  const D = (k, v) => setDraft(p => ({ ...p, [k]: v }));
 
-  const delPhoto = (photoId) => {
-    if (!entry) return;
-    const updated = { ...entry, photos: (entry.photos||[]).filter(p=>p.id!==photoId) };
-    setData(p => ({ ...p, [key]: updated }));
-  };
-
-  const uploadToCloudinary = async (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET);
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`, {
-      method: 'POST',
-      body: formData,
-    });
-    const data = await res.json();
-    return data.secure_url;
-  };
-
-  // 사진을 업로드 전에 작게 압축 (긴 변 1600px, 화질 80%) → 빠르고 가벼움
+  // 사진 압축 (긴 변 1600px, 화질 80%)
   const compressImage = (file) => new Promise((resolve) => {
     const img = new Image();
     const reader = new FileReader();
@@ -109,62 +104,74 @@ export default function DiaryTab({ data, setData, unlocked, setUnlocked }) {
       canvas.getContext('2d').drawImage(img, 0, 0, width, height);
       canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', 0.8);
     };
-    img.onerror = () => resolve(file); // 압축 실패하면 원본 그대로
+    img.onerror = () => resolve(file);
     reader.readAsDataURL(file);
   });
 
-  const addPhotos = async (files) => {
-    setUploading(true); // 로딩 켜기
+  const uploadToCloudinary = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`, {
+      method: 'POST', body: formData,
+    });
+    const data = await res.json();
+    return data.secure_url;
+  };
+
+  // 사진 선택 → 아직 업로드 안 하고 미리보기만 draft에 추가 (B 방식)
+  const pickPhotos = (files) => {
+    const added = Array.from(files).map(file => ({
+      id: uid(),
+      file,                                  // 저장 시 업로드할 실제 파일
+      preview: URL.createObjectURL(file),    // 화면 미리보기용 임시 주소
+      comment: '',
+    }));
+    setDraft(p => ({ ...p, photos: [...p.photos, ...added] }));
+  };
+
+  // draft 안 사진 1장 삭제 (확인창)
+  const removeDraftPhoto = (photoId) => {
+    if (!window.confirm('이 사진을 삭제하시겠습니까?\n(저장하면 영구 삭제됩니다)')) return;
+    setDraft(p => ({ ...p, photos: p.photos.filter(ph => ph.id !== photoId) }));
+  };
+
+  const setPhotoComment = (photoId, comment) => {
+    setDraft(p => ({ ...p, photos: p.photos.map(ph => ph.id === photoId ? { ...ph, comment } : ph) }));
+  };
+
+  // ── 저장: 새 사진만 업로드 후 전체를 DB에 저장 ───────────────────────────
+  const handleSave = async () => {
+    setUploading(true);
     try {
-      const newPhotos = await Promise.all(Array.from(files).map(async file => {
-        const compressed = await compressImage(file); // 압축 먼저
+      // file이 있는 사진(=새로 추가된 것)만 업로드, 기존 사진(src)은 그대로 둠
+      const finalPhotos = await Promise.all(draft.photos.map(async ph => {
+        if (ph.src) return { id: ph.id, src: ph.src, comment: ph.comment || '' }; // 기존 사진
+        const compressed = await compressImage(ph.file);
         const url = await uploadToCloudinary(compressed);
-        return { id: uid(), src: url, comment: '' };
+        return { id: ph.id, src: url, comment: ph.comment || '' };
       }));
-      const updated = { ...(entry||{date:key}), photos: [...((entry||{}).photos||[]), ...newPhotos] };
-      setData(p => ({ ...p, [key]: updated }));
+
+      const entry = {
+        date: key,
+        title: draft.title || '',
+        emotion: draft.emotion || '',
+        text: draft.text || '',
+        photos: finalPhotos,
+      };
+      setData(p => ({ ...p, [key]: entry }));
+      alert('저장됐어요! 🐷');
     } catch (err) {
-      alert('사진 업로드에 실패했어요. 다시 시도해주세요.');
+      alert('저장에 실패했어요. 다시 시도해주세요.');
     }
-    setUploading(false); // 로딩 끄기
+    setUploading(false);
   };
 
-  const updatePhotoComment = (photoId, comment) => {
-    const updated = { ...entry, photos: (entry.photos||[]).map(p=>p.id===photoId?{...p,comment}:p) };
-    setData(p => ({ ...p, [key]: updated }));
-  };
+  // 화면에 보일 사진 주소 (기존=src, 새 사진=preview)
+  const photoSrc = (ph) => ph.src || ph.preview;
 
-  const WriteModal = () => {
-    const [form, setForm] = useState(entry || { emotion: '', text: '' });
-    return (
-      <Modal title="일기 쓰기" onClose={() => setEditEntry(null)}>
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--sub)', marginBottom: 8, fontWeight: 600 }}>오늘의 감정</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-            {EMOTIONS.map(e => (
-              <button key={e.label} onClick={() => setForm(p=>({...p,emotion:e.label}))} style={{
-                padding: '10px 6px', borderRadius: 12, textAlign: 'center',
-                border: `2px solid ${form.emotion===e.label?'var(--accent)':'var(--border)'}`,
-                background: form.emotion===e.label?'var(--accent-bg)':'var(--card)',
-              }}>
-                <div style={{ fontSize: 22 }}>{e.emoji}</div>
-                <div style={{ fontSize: 11, color: form.emotion===e.label?'var(--accent)':'var(--sub)', marginTop: 3, fontWeight: form.emotion===e.label?700:400 }}>{e.label}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--sub)', marginBottom: 8, fontWeight: 600 }}>오늘 하루</div>
-          <textarea style={{ width:'100%', border:'1.5px solid var(--border)', borderRadius:12, padding:'12px', fontSize:14, lineHeight:1.8, minHeight:160, outline:'none', background:'var(--card)', color:'var(--text)', resize:'none' }}
-            placeholder="오늘은 어떤 하루였나요? ✍️"
-            value={form.text||''}
-            onChange={e => setForm(p=>({...p,text:e.target.value}))}
-          />
-        </div>
-        <SaveBtn onClick={() => saveEntry({ ...(entry||{}), ...form, date: key })} label="저장" />
-      </Modal>
-    );
-  };
+  // 변경사항이 있는지 (저장 버튼 활성화용)
+  const hasContent = draft.title || draft.emotion || draft.text || draft.photos.length > 0;
 
   return (
     <div style={{ padding: 16, paddingBottom: 90 }}>
@@ -172,110 +179,121 @@ export default function DiaryTab({ data, setData, unlocked, setUnlocked }) {
       {uploading && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:500, display:'flex', alignItems:'center', justifyContent:'center' }}>
           <div style={{ background:'var(--card)', borderRadius:16, padding:'24px 32px', textAlign:'center' }}>
-            <div style={{ fontSize:32, marginBottom:8 }}>📸</div>
-            <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>사진 올리는 중...</div>
-            <div style={{ fontSize:12, color:'var(--sub)', marginTop:4 }}>잠시만 기다려주세요 🐷</div>
+            <div style={{ fontSize:32, marginBottom:8 }}>💾</div>
+            <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>저장하는 중...</div>
+            <div style={{ fontSize:12, color:'var(--sub)', marginTop:4 }}>사진 올리는 중이에요 🐷</div>
           </div>
         </div>
       )}
 
-      {/* Date Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <button onClick={() => setDate(d => { const n = new Date(d); n.setDate(n.getDate()-1); return n; })} style={{ fontSize: 26, color: 'var(--accent)', padding: '2px 8px' }}>‹</button>
-        <button onClick={() => setShowCal(true)} style={{ textAlign: 'center', flex: 1 }}>
+      {/* 날짜 헤더 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <button onClick={() => setDate(d => { const n = new Date(d); n.setDate(n.getDate()-1); return n; })} style={{ fontSize: 26, color: 'var(--accent)', padding: '2px 8px', background:'none', border:'none', cursor:'pointer' }}>‹</button>
+        <button onClick={() => setShowCal(true)} style={{ textAlign: 'center', flex: 1, background:'none', border:'none', cursor:'pointer' }}>
           <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>{m}월 {day}일</div>
           <div style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600, marginTop: 2 }}>{y} {dow}요일</div>
         </button>
-        <button onClick={() => setDate(d => { const n = new Date(d); n.setDate(n.getDate()+1); return n; })} style={{ fontSize: 26, color: 'var(--accent)', padding: '2px 8px' }}>›</button>
+        <button onClick={() => setDate(d => { const n = new Date(d); n.setDate(n.getDate()+1); return n; })} style={{ fontSize: 26, color: 'var(--accent)', padding: '2px 8px', background:'none', border:'none', cursor:'pointer' }}>›</button>
       </div>
 
-      {/* Lock settings */}
+      {/* PIN 변경 */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <button onClick={() => setShowSetPin(true)} style={{ fontSize: 12, color: 'var(--sub)', display: 'flex', alignItems: 'center', gap: 4 }}>🔒 PIN 변경</button>
+        <button onClick={() => setShowSetPin(true)} style={{ fontSize: 12, color: 'var(--sub)', display: 'flex', alignItems: 'center', gap: 4, background:'none', border:'none', cursor:'pointer' }}>🔒 PIN 변경</button>
       </div>
 
-      {/* Entry */}
-      {entry ? (
-        <div>
-          {/* Emotion */}
-          {entry.emotion && (
-            <div style={{ textAlign: 'center', marginBottom: 16 }}>
-              {EMOTIONS.find(e=>e.label===entry.emotion) && (
-                <div>
-                  <div style={{ fontSize: 48 }}>{EMOTIONS.find(e=>e.label===entry.emotion)?.emoji}</div>
-                  <div style={{ fontSize: 13, color: 'var(--sub)', marginTop: 4, fontWeight: 600 }}>{entry.emotion}</div>
-                </div>
-              )}
-            </div>
-          )}
+      {/* 제목 */}
+      <input
+        value={draft.title}
+        onChange={e => D('title', e.target.value)}
+        placeholder="제목을 입력하세요"
+        style={{ width:'100%', border:'none', borderBottom:'2px solid var(--border)', background:'transparent', color:'var(--text)', fontSize:20, fontWeight:800, padding:'8px 2px', marginBottom:18, outline:'none', boxSizing:'border-box' }}
+      />
 
-          {/* Text */}
-          {entry.text && (
-            <div style={{ background: 'var(--card)', borderRadius: 16, padding: '18px', marginBottom: 16, lineHeight: 1.85, fontSize: 14, color: 'var(--text)', boxShadow: '0 2px 12px rgba(124,92,191,0.08)', whiteSpace: 'pre-wrap' }}>
-              {entry.text}
-            </div>
-          )}
-
-          {/* Photos (Polaroid style) */}
-          {(entry.photos||[]).length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
-              {entry.photos.map(photo => (
-                <div key={photo.id} style={{ background: '#fff', borderRadius: 4, padding: '12px 12px 8px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', transform: `rotate(${(Math.random()-0.5)*2}deg)` }}>
-                  <img
-                    src={photo.src}
-                    alt=""
-                    onClick={() => setViewPhoto(photo)}
-                    onContextMenu={e => { e.preventDefault(); if(window.confirm('사진을 삭제할까요?')) delPhoto(photo.id); }}
-                    style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', borderRadius: 2, cursor: 'pointer', display: 'block' }}
-                  />
-                  <input
-                    value={photo.comment||''}
-                    onChange={e => updatePhotoComment(photo.id, e.target.value)}
-                    placeholder="코멘트..."
-                    style={{ width:'100%', border:'none', outline:'none', fontSize:12, color:'var(--sub)', marginTop:8, background:'transparent', textAlign:'center', fontStyle:'italic' }}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Action buttons */}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setEditEntry(true)} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1.5px solid var(--border)', fontWeight: 700, color: 'var(--accent)', fontSize: 13 }}>✎ 수정</button>
-            <button onClick={() => fileRef.current?.click()} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1.5px solid var(--border)', fontWeight: 700, color: 'var(--sub)', fontSize: 13 }}>📸 사진 추가</button>
-          </div>
+      {/* 감정 */}
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 12, color: 'var(--sub)', marginBottom: 8, fontWeight: 600 }}>오늘의 감정</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+          {EMOTIONS.map(e => (
+            <button key={e.label} onClick={() => D('emotion', draft.emotion===e.label ? '' : e.label)} style={{
+              padding: '10px 6px', borderRadius: 12, textAlign: 'center', cursor:'pointer',
+              border: `2px solid ${draft.emotion===e.label?'var(--accent)':'var(--border)'}`,
+              background: draft.emotion===e.label?'var(--accent-bg)':'var(--card)',
+            }}>
+              <div style={{ fontSize: 22 }}>{e.emoji}</div>
+              <div style={{ fontSize: 11, color: draft.emotion===e.label?'var(--accent)':'var(--sub)', marginTop: 3, fontWeight: draft.emotion===e.label?700:400 }}>{e.label}</div>
+            </button>
+          ))}
         </div>
-      ) : (
-        <div style={{ textAlign: 'center', padding: '60px 0 30px' }}>
-          <div style={{ fontSize: 56, marginBottom: 16 }}>📓</div>
-          <div style={{ fontSize: 15, color: 'var(--sub)', lineHeight: 1.8, marginBottom: 24 }}>오늘의 일기를 써볼까요?</div>
-          <button onClick={() => setEditEntry(true)} style={{ padding: '14px 32px', borderRadius: 14, background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 15 }}>✍️ 일기 쓰기</button>
+      </div>
+
+      {/* 본문 */}
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 12, color: 'var(--sub)', marginBottom: 8, fontWeight: 600 }}>오늘 하루</div>
+        <textarea
+          value={draft.text}
+          onChange={e => D('text', e.target.value)}
+          placeholder="오늘은 어떤 하루였나요? ✍️"
+          style={{ width:'100%', border:'1.5px solid var(--border)', borderRadius:12, padding:'12px', fontSize:14, lineHeight:1.8, minHeight:150, outline:'none', background:'var(--card)', color:'var(--text)', resize:'none', boxSizing:'border-box' }}
+        />
+      </div>
+
+      {/* 사진들 (폴라로이드 + ✕ 삭제 + 줄바꿈 코멘트) */}
+      {draft.photos.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+          {draft.photos.map(photo => (
+            <div key={photo.id} style={{ position:'relative', background: '#fff', borderRadius: 4, padding: '12px 12px 8px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+              {/* ✕ 삭제 버튼 */}
+              <button onClick={() => removeDraftPhoto(photo.id)} style={{
+                position:'absolute', top:6, right:6, zIndex:2,
+                width:26, height:26, borderRadius:'50%', border:'none',
+                background:'rgba(0,0,0,0.55)', color:'#fff', fontSize:15, fontWeight:700,
+                cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1,
+              }}>×</button>
+              <img
+                src={photoSrc(photo)}
+                alt=""
+                onClick={() => setViewPhoto(photo)}
+                style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', borderRadius: 2, cursor: 'pointer', display: 'block' }}
+              />
+              {/* 코멘트: textarea라 줄바꿈 됨, 길어도 안 삐져나감 */}
+              <textarea
+                value={photo.comment || ''}
+                onChange={e => setPhotoComment(photo.id, e.target.value)}
+                placeholder="코멘트..."
+                rows={1}
+                style={{ width:'100%', border:'none', outline:'none', fontSize:12, color:'#555', marginTop:8, background:'transparent', textAlign:'center', fontStyle:'italic', resize:'none', fontFamily:'inherit', lineHeight:1.5, boxSizing:'border-box', overflow:'hidden' }}
+                onInput={e => { e.target.style.height='auto'; e.target.style.height = e.target.scrollHeight+'px'; }}
+              />
+            </div>
+          ))}
         </div>
       )}
 
-      {!entry && <button onClick={() => fileRef.current?.click()} style={{ width:'100%', marginTop:12, padding:'12px', borderRadius:12, border:'1.5px dashed var(--border)', color:'var(--sub)', fontSize:13 }}>📸 사진만 추가</button>}
+      {/* 사진 추가 */}
+      <button onClick={() => fileRef.current?.click()} style={{ width:'100%', marginBottom:16, padding:'12px', borderRadius:12, border:'1.5px dashed var(--border)', color:'var(--sub)', fontSize:13, background:'none', cursor:'pointer' }}>📸 사진 추가</button>
+      <input ref={fileRef} type="file" accept="image/*" multiple style={{ display:'none' }} onChange={e => { pickPhotos(e.target.files); e.target.value=''; }} />
 
-      <input ref={fileRef} type="file" accept="image/*" multiple style={{ display:'none' }} onChange={e => { addPhotos(e.target.files); e.target.value=''; }} />
+      {/* 저장 */}
+      <SaveBtn onClick={handleSave} disabled={!hasContent || uploading} label="저장하기" />
 
+      {/* 달력 */}
       {showCal && <CalendarOverlay current={{ y, m, day }} onSelect={setDate} onClose={() => setShowCal(false)} dotKeys={Object.keys(entries)} />}
 
-      {editEntry && <WriteModal />}
-
-      {/* Photo fullscreen */}
+      {/* 사진 전체화면 */}
       {viewPhoto && (
-        <div onClick={() => setViewPhoto(null)} style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.92)',zIndex:400,display:'flex',alignItems:'center',justifyContent:'center',padding:20 }}>
-          <img src={viewPhoto.src} alt="" style={{ maxWidth:'100%',maxHeight:'80vh',borderRadius:8,objectFit:'contain' }} />
+        <div onClick={() => setViewPhoto(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.92)', zIndex:400, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <img src={photoSrc(viewPhoto)} alt="" style={{ maxWidth:'100%', maxHeight:'80vh', borderRadius:8, objectFit:'contain' }} />
         </div>
       )}
 
-      {/* PIN change modal */}
+      {/* PIN 변경 모달 */}
       {showSetPin && (
         <Modal title="🔒 PIN 변경" onClose={() => { setShowSetPin(false); setNewPin(''); setNewPinConfirm(''); }}>
           <div style={{ marginBottom: 12 }}><label style={{ fontSize:11,color:'var(--sub)',fontWeight:600,display:'block',marginBottom:5 }}>새 PIN (4자리)</label>
-            <input style={{ width:'100%',border:'1.5px solid var(--border)',borderRadius:10,padding:'10px 12px',fontSize:14,background:'var(--card)',outline:'none',letterSpacing:8 }} type="password" maxLength={4} inputMode="numeric" value={newPin} onChange={e=>setNewPin(e.target.value)} placeholder="••••" />
+            <input style={{ width:'100%',border:'1.5px solid var(--border)',borderRadius:10,padding:'10px 12px',fontSize:14,background:'var(--card)',outline:'none',letterSpacing:8,boxSizing:'border-box' }} type="password" maxLength={4} inputMode="numeric" value={newPin} onChange={e=>setNewPin(e.target.value)} placeholder="••••" />
           </div>
           <div style={{ marginBottom: 12 }}><label style={{ fontSize:11,color:'var(--sub)',fontWeight:600,display:'block',marginBottom:5 }}>PIN 확인</label>
-            <input style={{ width:'100%',border:'1.5px solid var(--border)',borderRadius:10,padding:'10px 12px',fontSize:14,background:'var(--card)',outline:'none',letterSpacing:8 }} type="password" maxLength={4} inputMode="numeric" value={newPinConfirm} onChange={e=>setNewPinConfirm(e.target.value)} placeholder="••••" />
+            <input style={{ width:'100%',border:'1.5px solid var(--border)',borderRadius:10,padding:'10px 12px',fontSize:14,background:'var(--card)',outline:'none',letterSpacing:8,boxSizing:'border-box' }} type="password" maxLength={4} inputMode="numeric" value={newPinConfirm} onChange={e=>setNewPinConfirm(e.target.value)} placeholder="••••" />
           </div>
           {newPin && newPinConfirm && newPin!==newPinConfirm && <div style={{color:'var(--red)',fontSize:12,marginBottom:8}}>PIN이 일치하지 않아요</div>}
           <SaveBtn onClick={() => {
