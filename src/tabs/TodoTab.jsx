@@ -337,7 +337,7 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
           {sortedWork.map((t, i) => {
             const mv = workMoveable(i);
             return (
-              <<TaskRow key={t.id} item={{ ...t, _done: !!t.doneDate }} onToggle={() => toggleWork(t.id, t.startDate)} onEdit={() => openModal('work', t)} onDel={() => delWork(t.id, t.startDate)}
+              <TaskRow key={t.id} item={{ ...t, _done: !!t.doneDate }} onToggle={() => toggleWork(t.id, t.startDate)} onEdit={() => openModal('work', t)} onDel={() => delWork(t.id, t.startDate)}
                 onUp={() => moveWork(i, -1)} onDown={() => moveWork(i, +1)} canUp={mv.canUp} canDown={mv.canDown}
                 extra={
                   <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
