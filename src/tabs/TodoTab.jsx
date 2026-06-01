@@ -81,7 +81,12 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
 
   const todayWork = useMemo(() => {
     const all = Object.values(work).flat();
-    return all.filter(t => t.startDate <= key && (!t.removed || !t.removed[key]));
+    return all.filter(t => {
+      if (t.startDate > key) return false;                    // 아직 시작 안 함
+      if (t.removed && t.removed[key]) return false;          // 그날 삭제됨
+      if (t.doneDate && t.doneDate < key) return false;       // 완료한 날보다 이후면 숨김
+      return true;
+    });
   }, [work, key]);
 
   const todayDaily = useMemo(() => (daily[key] || []).slice().sort(byOrder), [daily, key]);
@@ -115,15 +120,14 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
     return diff <= 10;
   }), [essItems]);
 
-  // ── 완료 토글 ────────────────────────────────────────────────────────────
-  const isDone = id => !!(completed[key] && completed[key][id]);
-  const toggle = id => {
+  // 회사업무 전용 완료 토글: 업무 자체에 doneDate 기록 (완료하면 다음날부터 사라짐)
+  const toggleWork = (id, startDate) => {
     setData(p => {
-      const c = { ...p.completed };
-      c[key] = { ...(c[key] || {}) };
-      if (c[key][id]) delete c[key][id];
-      else c[key][id] = true;
-      return { ...p, completed: c };
+      const w = { ...p.work };
+      w[startDate] = (w[startDate] || []).map(t =>
+        t.id === id ? { ...t, doneDate: t.doneDate ? null : key } : t
+      );
+      return { ...p, work: w };
     });
   };
 
@@ -259,7 +263,7 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
   // ── 할일 행 ────────────────────────────────────────────────────────────────
   const TaskRow = ({ item, onToggle, onEdit, onDel, onUp, onDown, canUp, canDown, extra }) => {
     const [open, setOpen] = useState(false);
-    const done = isDone(item.id);
+    const done = item._done !== undefined ? item._done : isDone(item.id);
     return (
       <div style={{ borderBottom: '1px solid var(--border)' }}>
         <div onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'flex-start', padding: '13px 16px', cursor: 'pointer', gap: 12, userSelect: 'none' }}>
@@ -333,7 +337,7 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
           {sortedWork.map((t, i) => {
             const mv = workMoveable(i);
             return (
-              <TaskRow key={t.id} item={t} onToggle={() => toggle(t.id)} onEdit={() => openModal('work', t)} onDel={() => delWork(t.id, t.startDate)}
+              <<TaskRow key={t.id} item={{ ...t, _done: !!t.doneDate }} onToggle={() => toggleWork(t.id, t.startDate)} onEdit={() => openModal('work', t)} onDel={() => delWork(t.id, t.startDate)}
                 onUp={() => moveWork(i, -1)} onDown={() => moveWork(i, +1)} canUp={mv.canUp} canDown={mv.canDown}
                 extra={
                   <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
