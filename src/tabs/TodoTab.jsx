@@ -170,9 +170,10 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
     if (!form.title?.trim()) return;
     setData(p => {
       const d = { ...p.daily };
-      if (editItem) {
-        d[key] = (d[key] || []).map(t => t.id === editItem.id ? { ...t, ...form, title: form.title.trim() } : t);
-      } else {
+      if (editItem?.id) {
+        Object.keys(w).forEach(dk => { w[dk] = (w[dk] || []).filter(t => t.id !== editItem.id); });
+        w[form.startDate] = [...(w[form.startDate] || []), { ...form, id: editItem.id, title: form.title.trim() }];
+     } else {
         const bucket = d[key] || [];
         d[key] = [...bucket, { id: uid(), ...form, title: form.title.trim(), addedDate: key, order: nextOrder(bucket) }];
       }
@@ -344,7 +345,7 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
               />
             );
           })}
-          <AddRowBtn onClick={() => openModal('work')} />
+          <AddRowBtn onClick={() => openModal('work', { startDate: key })} />
         </div>
       </div>
 
