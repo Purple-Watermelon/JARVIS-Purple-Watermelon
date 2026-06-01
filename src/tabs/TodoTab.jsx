@@ -120,6 +120,18 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
     return diff <= 10;
   }), [essItems]);
 
+  // ── 완료 토글 ────────────────────────────────────────────────────────────
+  const isDone = id => !!(completed[key] && completed[key][id]);
+  const toggle = id => {
+    setData(p => {
+      const c = { ...p.completed };
+      c[key] = { ...(c[key] || {}) };
+      if (c[key][id]) delete c[key][id];
+      else c[key][id] = true;
+      return { ...p, completed: c };
+    });
+  };
+
   // 회사업무 전용 완료 토글: 업무 자체에 doneDate 기록 (완료하면 다음날부터 사라짐)
   const toggleWork = (id, startDate) => {
     setData(p => {
