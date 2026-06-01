@@ -171,9 +171,8 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
     setData(p => {
       const d = { ...p.daily };
       if (editItem?.id) {
-        Object.keys(w).forEach(dk => { w[dk] = (w[dk] || []).filter(t => t.id !== editItem.id); });
-        w[form.startDate] = [...(w[form.startDate] || []), { ...form, id: editItem.id, title: form.title.trim() }];
-     } else {
+        d[key] = (d[key] || []).map(t => t.id === editItem.id ? { ...t, ...form, title: form.title.trim() } : t);
+      } else {
         const bucket = d[key] || [];
         d[key] = [...bucket, { id: uid(), ...form, title: form.title.trim(), addedDate: key, order: nextOrder(bucket) }];
       }
