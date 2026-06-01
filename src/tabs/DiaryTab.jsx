@@ -23,7 +23,7 @@ export default function DiaryTab({ data, setData, unlocked, setUnlocked }) {
   const [showSetPin, setShowSetPin] = useState(false);
   const [newPin, setNewPin] = useState('');
   const [newPinConfirm, setNewPinConfirm] = useState('');
-  const fileRef = useRef();
+  const [uploading, setUploading] = useState(false);
 
   const { y, m, day, dow, key } = fmtDate(date);
   const entries = data || {};
@@ -94,13 +94,39 @@ export default function DiaryTab({ data, setData, unlocked, setUnlocked }) {
     return data.secure_url;
   };
 
+  // 사진을 업로드 전에 작게 압축 (긴 변 1600px, 화질 80%) → 빠르고 가벼움
+  const compressImage = (file) => new Promise((resolve) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; };
+    img.onload = () => {
+      const MAX = 1600;
+      let { width, height } = img;
+      if (width > height && width > MAX) { height = height * MAX / width; width = MAX; }
+      else if (height > MAX) { width = width * MAX / height; height = MAX; }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', 0.8);
+    };
+    img.onerror = () => resolve(file); // 압축 실패하면 원본 그대로
+    reader.readAsDataURL(file);
+  });
+
   const addPhotos = async (files) => {
-    const newPhotos = await Promise.all(Array.from(files).map(async file => {
-      const url = await uploadToCloudinary(file);
-      return { id: uid(), src: url, comment: '' };
-    }));
-    const updated = { ...(entry||{date:key}), photos: [...((entry||{}).photos||[]), ...newPhotos] };
-    setData(p => ({ ...p, [key]: updated }));
+    setUploading(true); // 로딩 켜기
+    try {
+      const newPhotos = await Promise.all(Array.from(files).map(async file => {
+        const compressed = await compressImage(file); // 압축 먼저
+        const url = await uploadToCloudinary(compressed);
+        return { id: uid(), src: url, comment: '' };
+      }));
+      const updated = { ...(entry||{date:key}), photos: [...((entry||{}).photos||[]), ...newPhotos] };
+      setData(p => ({ ...p, [key]: updated }));
+    } catch (err) {
+      alert('사진 업로드에 실패했어요. 다시 시도해주세요.');
+    }
+    setUploading(false); // 로딩 끄기
   };
 
   const updatePhotoComment = (photoId, comment) => {
@@ -142,6 +168,17 @@ export default function DiaryTab({ data, setData, unlocked, setUnlocked }) {
 
   return (
     <div style={{ padding: 16, paddingBottom: 90 }}>
+      {/* 업로드 중 표시 */}
+      {uploading && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:500, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ background:'var(--card)', borderRadius:16, padding:'24px 32px', textAlign:'center' }}>
+            <div style={{ fontSize:32, marginBottom:8 }}>📸</div>
+            <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>사진 올리는 중...</div>
+            <div style={{ fontSize:12, color:'var(--sub)', marginTop:4 }}>잠시만 기다려주세요 🐷</div>
+          </div>
+        </div>
+      )}
+
       {/* Date Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <button onClick={() => setDate(d => { const n = new Date(d); n.setDate(n.getDate()-1); return n; })} style={{ fontSize: 26, color: 'var(--accent)', padding: '2px 8px' }}>‹</button>
