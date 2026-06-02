@@ -124,6 +124,25 @@ export default function SettingsTab({ cats, setCats, gTags, setGTags, discReason
         </div>
       </Card>
 
+      {/* ⚠️ 임시: 회사업무 전체 삭제 (쓰고 나서 이 카드 통째로 지울 것) */}
+      <Card>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 10, color: 'var(--red)' }}>⚠️ 회사업무 데이터 정리</div>
+        <div style={{ fontSize: 13, color: 'var(--sub)', marginBottom: 12, lineHeight: 1.6 }}>
+          버그로 쌓인 회사업무 찌꺼기를 전부 삭제해요.<br/>
+          (루틴·일상·위시·일기·가계부는 안 지워져요)
+        </div>
+        <button
+          onClick={() => {
+            if (!window.confirm('회사업무를 전부 삭제할까요?\n되돌릴 수 없어요!')) return;
+            setTodoData(p => ({ ...p, work: {} }));
+            alert('회사업무를 모두 삭제했어요! 🐷');
+          }}
+          style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: 'var(--red)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+        >
+          🗑 회사업무 전체 삭제
+        </button>
+      </Card>
+
       {/* 앱 정보 */}
       <Card>
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>앱 정보</div>
