@@ -168,6 +168,7 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
 
   const saveWork = () => {
     if (!form.title?.trim() || !form.startDate) return;
+    if (!form.due) form.due = form.startDate;  // 마감일 비우면 시작일과 같은 날로
     setData(p => {
       const w = { ...p.work };
       if (editItem?.id) {
