@@ -4,7 +4,7 @@ import { Card } from '../components/UI';
 const lbl = { fontSize: 11, color: 'var(--sub)', display: 'block', marginBottom: 5, fontWeight: 600 };
 const inp = { width: '100%', border: '1.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: 'var(--card)', color: 'var(--text)', outline: 'none', WebkitAppearance: 'none' };
 
-export default function SettingsTab({ cats, setCats, gTags, setGTags, discReasons, setDiscReasons, todoData, setTodoData }) {
+export default function SettingsTab({ cats, setCats, gTags, setGTags, discReasons, setDiscReasons }) {
   const [selCat, setSelCat] = useState(Object.keys(cats)[0] || '');
   const [newCat, setNewCat] = useState('');
   const [newSub, setNewSub] = useState('');
