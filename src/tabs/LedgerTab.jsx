@@ -18,7 +18,10 @@ export default function LedgerTab({ data, setData, cats, gTags, setGTags, essIte
   const [aiLoading, setAiLoading] = useState(false);
 
   // 기록 탭: 선택된 날짜
-  const todayKey = new Date().toISOString().slice(0,10);
+  const todayKey = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  })();
   const [selectedDay, setSelectedDay] = useState(todayKey);
   const [showMonthPick, setShowMonthPick] = useState(false);
 
