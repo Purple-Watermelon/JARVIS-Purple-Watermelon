@@ -99,7 +99,7 @@ const USER_ID = 'subin';
         {tab === 'diary'    && <DiaryTab    data={diaryData}  setData={setDiaryData}  unlocked={diaryUnlocked} setUnlocked={setDiaryUnlocked} />}
         {tab === 'cycle'    && <CycleTab    data={essItems}   setData={setEssItems} />}
         {tab === 'calendar' && <CalendarTab todoData={todoData} />}
-        {tab === 'settings' && <SettingsTab cats={cats} setCats={setCats} gTags={gTags} setGTags={setGTags} discReasons={discReasons} setDiscReasons={setDiscReasons} />}
+        {tab === 'settings' && <SettingsTab cats={cats} setCats={setCats} gTags={gTags} setGTags={setGTags} discReasons={discReasons} setDiscReasons={setDiscReasons} todoData={todoData} setTodoData={setTodoData} />}
       </div>
 
       <div style={{
