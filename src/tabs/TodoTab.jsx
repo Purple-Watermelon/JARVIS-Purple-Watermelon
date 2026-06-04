@@ -168,15 +168,19 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
 
   const saveWork = () => {
     if (!form.title?.trim() || !form.startDate) return;
-    if (!form.due) form.due = form.startDate;  // 마감일 비우면 시작일과 같은 날로
+    // 마감일 비우면 시작일과 같은 날로 (form을 직접 고치지 않고 새 변수 사용)
+    const due = form.due || form.startDate;
     setData(p => {
       const w = { ...p.work };
+      const item = { ...form, due, title: form.title.trim(), id: editItem?.id || uid() };
       if (editItem?.id) {
+        // 모든 날짜에서 이 업무를 빼고
         Object.keys(w).forEach(dk => { w[dk] = (w[dk] || []).filter(t => t.id !== editItem.id); });
-        w[form.startDate] = [...(w[form.startDate] || []), { ...form, id: editItem.id, title: form.title.trim() }];
-     } else {
+        // 새 시작일에 다시 넣기 (order 유지)
+        w[form.startDate] = [...(w[form.startDate] || []), item];
+      } else {
         const bucket = w[form.startDate] || [];
-        w[form.startDate] = [...bucket, { ...form, id: uid(), title: form.title.trim(), order: nextOrder(bucket) }];
+        w[form.startDate] = [...bucket, { ...item, order: nextOrder(bucket) }];
       }
       return { ...p, work: w };
     });
