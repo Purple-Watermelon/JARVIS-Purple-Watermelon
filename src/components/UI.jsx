@@ -54,7 +54,7 @@ export function CalendarOverlay({ current, onSelect, onClose, dotKeys = [] }) {
   const y = view.getFullYear(), m = view.getMonth();
   const firstDay = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = (() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
   const curKey = `${current.y}-${String(current.m).padStart(2,'0')}-${String(current.day).padStart(2,'0')}`;
 
   return (
