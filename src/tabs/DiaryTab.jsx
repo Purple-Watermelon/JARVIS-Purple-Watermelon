@@ -257,12 +257,12 @@ export default function DiaryTab({ data, setData, unlocked, setUnlocked }) {
               />
               {/* 코멘트: textarea라 줄바꿈 됨, 길어도 안 삐져나감 */}
               <textarea
+                ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                 value={photo.comment || ''}
-                onChange={e => setPhotoComment(photo.id, e.target.value)}
+                onChange={e => { setPhotoComment(photo.id, e.target.value); e.target.style.height='auto'; e.target.style.height = e.target.scrollHeight+'px'; }}
                 placeholder="코멘트..."
                 rows={1}
-                style={{ width:'100%', border:'none', outline:'none', fontSize:12, color:'#555', marginTop:8, background:'transparent', textAlign:'center', fontStyle:'italic', resize:'none', fontFamily:'inherit', lineHeight:1.5, boxSizing:'border-box', overflow:'hidden' }}
-                onInput={e => { e.target.style.height='auto'; e.target.style.height = e.target.scrollHeight+'px'; }}
+                style={{ width:'100%', border:'none', outline:'none', fontSize:12, color:'#555', marginTop:8, background:'transparent', textAlign:'center', fontStyle:'italic', resize:'none', fontFamily:'inherit', lineHeight:1.6, boxSizing:'border-box', overflow:'hidden', display:'block' }}
               />
             </div>
           ))}
