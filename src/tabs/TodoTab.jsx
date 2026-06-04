@@ -155,6 +155,16 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
 
   // 새 항목 추가 시 order = 현재 목록 최대 +1
   const nextOrder = (list) => (list.length ? Math.max(...list.map(x => x.order ?? 0)) + 1 : 0);
+  // 마감일까지 며칠 남았는지 + 색/이모지 계산
+  const getDDay = (due) => {
+    if (!due) return null;
+    const diff = Math.ceil((new Date(due + 'T00:00:00') - new Date(key + 'T00:00:00')) / 864e5);
+    if (diff < 0)        return { color: '#c0392b', label: `💀 D+${Math.abs(diff)}`, bold: true };
+    if (diff === 0)      return { color: '#e05252', label: '🚨 D-DAY', bold: true };
+    if (diff <= 2)       return { color: '#e05252', label: `D-${diff}`, bold: false };
+    if (diff <= 7)       return { color: '#e8a838', label: `D-${diff}`, bold: false };
+    return { color: '#52ae7a', label: `D-${diff}`, bold: false };
+  };
 
   const saveRoutine = () => {
     if (!form.title?.trim()) return;
@@ -279,7 +289,7 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
   };
 
   // ── 할일 행 ────────────────────────────────────────────────────────────────
-  const TaskRow = ({ item, onToggle, onEdit, onDel, onUp, onDown, canUp, canDown, extra }) => {
+  const TaskRow = ({ item, onToggle, onEdit, onDel, onUp, onDown, canUp, canDown, extra, badge }) => {
     const [open, setOpen] = useState(false);
     const done = item._done !== undefined ? item._done : isDone(item.id);
     return (
@@ -291,14 +301,21 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
             {extra}
             {item.memo && <div style={{ fontSize: 11.5, color: 'var(--sub)', marginTop: 4, lineHeight: 1.5 }}>{item.memo}</div>}
           </div>
-          <button onClick={e => { e.stopPropagation(); onToggle(); }} style={{
-            flexShrink: 0, width: 24, height: 24, borderRadius: 8, marginTop: 1,
-            border: `2px solid ${done ? 'var(--accent)' : 'var(--border)'}`,
-            background: done ? 'var(--accent)' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {done && <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>✓</span>}
-          </button>
+          <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            {badge && (
+              <span style={{ fontSize: 11, fontWeight: badge.bold ? 800 : 700, color: badge.color, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+                {badge.label}
+              </span>
+            )}
+            <button onClick={e => { e.stopPropagation(); onToggle(); }} style={{
+              width: 24, height: 24, borderRadius: 8, marginTop: 1,
+              border: `2px solid ${done ? 'var(--accent)' : 'var(--border)'}`,
+              background: done ? 'var(--accent)' : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {done && <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>✓</span>}
+            </button>
+          </div>
         </div>
         {open && (
           <ActionBar
@@ -356,6 +373,7 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
             const mv = workMoveable(i);
             return (
               <TaskRow key={t.id} item={{ ...t, _done: !!t.doneDate }} onToggle={() => toggleWork(t.id, t.startDate)} onEdit={() => openModal('work', t)} onDel={() => delWork(t.id, t.startDate)}
+                badge={getDDay(t.due)}
                 onUp={() => moveWork(i, -1)} onDown={() => moveWork(i, +1)} canUp={mv.canUp} canDown={mv.canDown}
                 extra={
                   <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
