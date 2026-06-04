@@ -216,7 +216,8 @@ export default function TodoTab({ data, setData, essItems, setEssItems }) {
   const delRoutine = id => setData(p => ({ ...p, routines: (p.routines || []).map(r => r.id === id ? { ...r, removed: { ...(r.removed||{}), [key]: true } } : r) }));
   const delWork = (id, startDate) => setData(p => {
     const w = { ...p.work };
-    w[startDate] = (w[startDate] || []).map(t => t.id === id ? { ...t, removed: { ...(t.removed||{}), [key]: true } } : t);
+    // 모든 날짜 묶음에서 이 id를 가진 업무를 완전히 제거
+    Object.keys(w).forEach(dk => { w[dk] = (w[dk] || []).filter(t => t.id !== id); });
     return { ...p, work: w };
   });
   const delDaily = id => setData(p => { const d = { ...p.daily }; d[key] = (d[key] || []).filter(t => t.id !== id); return { ...p, daily: d }; });
