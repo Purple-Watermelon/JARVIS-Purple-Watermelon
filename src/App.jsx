@@ -46,18 +46,33 @@ const USER_ID = 'subin';
   // Load all from Firebase
   useEffect(() => {
     const load = async () => {
-      try {
-        const keys = ['todo','ledger','diary','ess','cats','tags','discReasons'];
-        const docs = await Promise.all(keys.map(k => getDoc(doc(db, k, USER_ID))));
-        const [td, ld, dd, ed, cd, tgs, dr] = docs.map(d => d.exists() ? d.data().value : null);
-        if (td)  setTodoData(td);
-        if (ld)  setLedgerData(ld);
-        if (dd)  setDiaryData(dd);
-        if (ed)  setEssItems(ed);
-        if (cd)  setCats(cd);
-        if (tgs) setGTags(tgs);
-        if (dr)  setDiscReasons(dr);
-      } catch(e) { console.error('Firebase load error:', e); }
+      // 키 하나를 안전하게 불러오는 함수: 실패해도 null만 돌려주고 멈추지 않음
+      const loadOne = async (key) => {
+        try {
+          const snap = await getDoc(doc(db, key, USER_ID));
+          return snap.exists() ? snap.data().value : null;
+        } catch (e) {
+          console.error(`[불러오기 실패] ${key}:`, e); // 어떤 묶음이 실패했는지 콘솔에 표시
+          return null;
+        }
+      };
+
+      const td  = await loadOne('todo');
+      const ld  = await loadOne('ledger');
+      const dd  = await loadOne('diary');
+      const ed  = await loadOne('ess');
+      const cd  = await loadOne('cats');
+      const tgs = await loadOne('tags');
+      const dr  = await loadOne('discReasons');
+
+      if (td)  setTodoData(td);
+      if (ld)  setLedgerData(ld);
+      if (dd)  setDiaryData(dd);
+      if (ed)  setEssItems(ed);
+      if (cd)  setCats(cd);
+      if (tgs) setGTags(tgs);
+      if (dr)  setDiscReasons(dr);
+
       setReady(true);
     };
     load();
