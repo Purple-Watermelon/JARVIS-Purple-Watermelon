@@ -73,6 +73,7 @@ const USER_ID = 'subin';
       if (tgs) setGTags(tgs);
       if (dr)  setDiscReasons(dr);
 
+      console.log('🔍 불러온 데이터:', { td, ld, dd, ed, cd, tgs, dr });
       setReady(true);
     };
     load();
