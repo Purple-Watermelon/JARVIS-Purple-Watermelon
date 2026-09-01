@@ -507,6 +507,20 @@ export default function App() {
             '18px 14px 92px'
         }}
       >
+        {tab === 'home' && (
+  <HomeTab
+    todoData={todoData}
+    ledgerData={ledgerData}
+    diaryData={diaryData}
+    onNavigate={nextTab => {
+      if (nextTab === 'diary') {
+        setDiaryUnlocked(false);
+      }
+
+      setTab(nextTab);
+    }}
+  />
+)}
         {tab === 'todo' && (
           <TodoTab
             data={todoData}
@@ -602,95 +616,360 @@ export default function App() {
             '5px 4px calc(5px + env(safe-area-inset-bottom))'
         }}
       >
-        {TABS.map(t => {
-          const active =
-            tab === t.id;
+      <nav
+  style={{
+    position: 'fixed',
+    bottom: 0,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: '100%',
+    maxWidth: 480,
+    background: 'rgba(255,253,251,0.96)',
+    backdropFilter: 'blur(14px)',
+    borderTop: '1px solid var(--border)',
+    display: 'flex',
+    zIndex: 100,
+    padding:
+      '6px 12px calc(6px + env(safe-area-inset-bottom))',
+    gap: 8
+  }}
+>
 
-          return (
-            <button
-              key={t.id}
-              onClick={() => {
-                if (
-                  t.id === 'diary' &&
-                  tab !== 'diary'
-                ) {
-                  setDiaryUnlocked(
-                    false
-                  );
-                }
+  {/* 메뉴 */}
 
-                setTab(t.id);
-              }}
-              style={{
-                flex: 1,
-                padding:
-                  '6px 0 5px',
-                borderRadius: 12,
-                background:
-                  active
-                    ? 'var(--accent-bg)'
-                    : 'transparent',
-                color:
-                  active
-                    ? 'var(--accent)'
-                    : 'var(--sub)',
-                cursor: 'pointer',
-                transition:
-                  'all 0.2s'
-              }}
-            >
-              <div
-                style={{
-                  width: 27,
-                  height: 27,
-                  margin: '0 auto 2px',
-                  borderRadius:
-                    '50%',
-                  display: 'flex',
-                  alignItems:
-                    'center',
-                  justifyContent:
-                    'center',
-                  fontFamily:
-                    "'Noto Serif KR','Batang',serif",
-                  fontSize:
-                    t.id ===
-                    'ledger'
-                      ? 15
-                      : 17,
-                  fontWeight:
-                    active
-                      ? 700
-                      : 400,
-                  background:
-                    active
-                      ? 'var(--card)'
-                      : 'transparent',
-                  border:
-                    active
-                      ? '1px solid var(--border)'
-                      : '1px solid transparent'
-                }}
-              >
-                {t.icon}
-              </div>
+  <button
+    onClick={() => setMenuOpen(true)}
+    style={{
+      flex: 1,
+      border: 'none',
+      background: 'transparent',
+      color: 'var(--sub)',
+      padding: '5px 0',
+      cursor: 'pointer'
+    }}
+  >
+    <div
+      style={{
+        fontSize: 21,
+        lineHeight: 1,
+        marginBottom: 3
+      }}
+    >
+      ☰
+    </div>
 
-              <div
-                style={{
-                  fontSize: 9,
-                  fontWeight:
-                    active
-                      ? 700
-                      : 400,
-                  letterSpacing: 0.2
-                }}
-              >
-                {t.label}
-              </div>
-            </button>
-          );
-        })}
+    <div style={{ fontSize: 9 }}>
+      메뉴
+    </div>
+  </button>
+
+
+  {/* 홈 */}
+
+  <button
+    onClick={() => setTab('home')}
+    style={{
+      flex: 1,
+      border: 'none',
+      background: 'transparent',
+      color:
+        tab === 'home'
+          ? 'var(--accent)'
+          : 'var(--sub)',
+      padding: '5px 0',
+      cursor: 'pointer'
+    }}
+  >
+    <div
+      style={{
+        width: 30,
+        height: 30,
+        margin: '0 auto 2px',
+        borderRadius: '50%',
+        background:
+          tab === 'home'
+            ? 'var(--accent-bg)'
+            : 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 18
+      }}
+    >
+      ⌂
+    </div>
+
+    <div
+      style={{
+        fontSize: 9,
+        fontWeight:
+          tab === 'home' ? 700 : 400
+      }}
+    >
+      홈
+    </div>
+  </button>
+
+
+  {/* 설정 */}
+
+  <button
+    onClick={() => setTab('settings')}
+    style={{
+      flex: 1,
+      border: 'none',
+      background: 'transparent',
+      color:
+        tab === 'settings'
+          ? 'var(--accent)'
+          : 'var(--sub)',
+      padding: '5px 0',
+      cursor: 'pointer'
+    }}
+  >
+    <div
+      style={{
+        width: 30,
+        height: 30,
+        margin: '0 auto 2px',
+        borderRadius: '50%',
+        background:
+          tab === 'settings'
+            ? 'var(--accent-bg)'
+            : 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 17
+      }}
+    >
+      ⚙
+    </div>
+
+    <div
+      style={{
+        fontSize: 9,
+        fontWeight:
+          tab === 'settings' ? 700 : 400
+      }}
+    >
+      설정
+    </div>
+  </button>
+
+</nav>  
+         
       </nav>
+    {menuOpen && (
+  <>
+    {/* 배경 */}
+
+    <div
+      onClick={() => setMenuOpen(false)}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(35,25,45,0.22)',
+        zIndex: 200
+      }}
+    />
+
+    {/* 사이드바 */}
+
+    <aside
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        bottom: 0,
+        width: 'min(78vw, 320px)',
+        background: 'var(--card)',
+        zIndex: 201,
+        boxShadow:
+          '8px 0 30px rgba(50,40,60,0.14)',
+        padding:
+          '24px 18px calc(30px + env(safe-area-inset-bottom))',
+        overflowY: 'auto'
+      }}
+    >
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '4px 4px 25px'
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontFamily:
+                "'Noto Serif KR','Batang',serif",
+              fontSize: 21,
+              fontWeight: 700,
+              color: 'var(--accent)'
+            }}
+          >
+            JARVIS
+          </div>
+
+          <div
+            style={{
+              marginTop: 3,
+              fontSize: 9,
+              color: 'var(--sub)',
+              letterSpacing: 0.6
+            }}
+          >
+            purple watermelon
+          </div>
+        </div>
+
+        <button
+          onClick={() => setMenuOpen(false)}
+          style={{
+            border: 'none',
+            background: 'transparent',
+            fontSize: 22,
+            color: 'var(--sub)',
+            cursor: 'pointer'
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+
+      {/* 홈 */}
+
+      <button
+        onClick={() => {
+          setTab('home');
+          setMenuOpen(false);
+        }}
+        style={{
+          width: '100%',
+          border: 'none',
+          background:
+            tab === 'home'
+              ? 'var(--accent-bg)'
+              : 'transparent',
+          borderRadius: 14,
+          padding: '13px 14px',
+          textAlign: 'left',
+          color:
+            tab === 'home'
+              ? 'var(--accent)'
+              : 'var(--text)',
+          fontSize: 13,
+          fontWeight:
+            tab === 'home' ? 700 : 500,
+          cursor: 'pointer',
+          marginBottom: 5
+        }}
+      >
+        🏠　홈
+      </button>
+
+
+      {/* 메뉴 항목 */}
+
+      {[
+        ['todo', '✓', '할 일'],
+        ['ledger', '₩', '가계부'],
+        ['calendar', '○', '달력'],
+        ['diary', '✎', '일기'],
+        ['cycle', '↻', '주기']
+      ].map(([id, icon, label]) => (
+        <button
+          key={id}
+          onClick={() => {
+            if (id === 'diary') {
+              setDiaryUnlocked(false);
+            }
+
+            setTab(id);
+            setMenuOpen(false);
+          }}
+          style={{
+            width: '100%',
+            border: 'none',
+            background:
+              tab === id
+                ? 'var(--accent-bg)'
+                : 'transparent',
+            borderRadius: 14,
+            padding: '13px 14px',
+            textAlign: 'left',
+            color:
+              tab === id
+                ? 'var(--accent)'
+                : 'var(--text)',
+            fontSize: 13,
+            fontWeight:
+              tab === id ? 700 : 500,
+            cursor: 'pointer',
+            marginBottom: 5
+          }}
+        >
+          <span
+            style={{
+              display: 'inline-block',
+              width: 25,
+              fontSize: 16
+            }}
+          >
+            {icon}
+          </span>
+
+          {label}
+        </button>
+      ))}
+
+
+      <div
+        style={{
+          height: 1,
+          background: 'var(--border)',
+          margin: '18px 8px'
+        }}
+      />
+
+
+      {/* 설정 */}
+
+      <button
+        onClick={() => {
+          setTab('settings');
+          setMenuOpen(false);
+        }}
+        style={{
+          width: '100%',
+          border: 'none',
+          background:
+            tab === 'settings'
+              ? 'var(--accent-bg)'
+              : 'transparent',
+          borderRadius: 14,
+          padding: '13px 14px',
+          textAlign: 'left',
+          color:
+            tab === 'settings'
+              ? 'var(--accent)'
+              : 'var(--text)',
+          fontSize: 13,
+          fontWeight:
+            tab === 'settings' ? 700 : 500,
+          cursor: 'pointer'
+        }}
+      >
+        ⚙　설정
+      </button>
+
+    </aside>
+  </>
+)}  
     </div>
   );
 }
