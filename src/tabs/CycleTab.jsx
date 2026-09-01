@@ -100,10 +100,9 @@ function ItemDetail({ item, onClose, onAddHistory, onEditHistory, onDelHistory, 
 
   const history = [...(item.history || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
   const allPrices = history.filter(h => h.qty).map(h => Math.round(h.totalAmount / h.qty));
-  const minPrice = allPrices.length > 1 ? Math.min(...allPrices) : null;
+  const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : null;
+  const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : null;
   const avgPrice = allPrices.length > 0 ? Math.round(allPrices.reduce((a, b) => a + b) / allPrices.length) : null;
-  const totalAmount = history.reduce((sum, h) => sum + h.totalAmount, 0);
-  const totalQty = history.reduce((sum, h) => sum + (h.qty || 0), 0);
   const interval = calcInterval(item.history || []);
   const diff = getNextDiff(item);
   const { dot, color, label } = statusInfo(diff);
@@ -210,22 +209,26 @@ function ItemDetail({ item, onClose, onAddHistory, onEditHistory, onDelHistory, 
           </div>
         )}
 
-        {/* 통계 요약 */}
+        {/* 통계 요약 (평균가격, 최고가, 최저가, 구매주기) */}
         {history.length > 0 && (
           <div style={{ padding: '0 20px', marginBottom: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div style={{ background: 'var(--bg)', borderRadius: 12, padding: 12 }}>
-                <div style={{ fontSize: 10, color: 'var(--sub)', fontWeight: 600, marginBottom: 4 }}>💰 총 금액</div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)' }}>{fmt(totalAmount)}원</div>
-              </div>
-              <div style={{ background: 'var(--bg)', borderRadius: 12, padding: 12 }}>
-                <div style={{ fontSize: 10, color: 'var(--sub)', fontWeight: 600, marginBottom: 4 }}>📦 총 용량</div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--green)' }}>{fmt(totalQty)}{unit}</div>
-              </div>
               {avgPrice && (
                 <div style={{ background: 'var(--bg)', borderRadius: 12, padding: 12 }}>
                   <div style={{ fontSize: 10, color: 'var(--sub)', fontWeight: 600, marginBottom: 4 }}>💵 평균 가격</div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{fmt(avgPrice)}원/{unit}</div>
+                </div>
+              )}
+              {maxPrice && (
+                <div style={{ background: 'var(--bg)', borderRadius: 12, padding: 12 }}>
+                  <div style={{ fontSize: 10, color: 'var(--sub)', fontWeight: 600, marginBottom: 4 }}>📈 최고가</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{fmt(maxPrice)}원/{unit}</div>
+                </div>
+              )}
+              {minPrice && (
+                <div style={{ background: 'var(--bg)', borderRadius: 12, padding: 12 }}>
+                  <div style={{ fontSize: 10, color: 'var(--sub)', fontWeight: 600, marginBottom: 4 }}>📉 최저가</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--green)' }}>{fmt(minPrice)}원/{unit}</div>
                 </div>
               )}
               {interval && (
