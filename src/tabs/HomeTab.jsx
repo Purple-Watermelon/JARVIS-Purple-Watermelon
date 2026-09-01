@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { toDay } from '../utils/helpers';
 
 export default function HomeTab({
   todoData,
@@ -19,6 +20,7 @@ export default function HomeTab({
 
   // ─────────────────────────────────────────
   // 오늘의 지출
+  // LedgerTab과 동일하게 datetime / isSaving / amount 사용
   // ─────────────────────────────────────────
 
   const todayExpense = useMemo(() => {
@@ -26,31 +28,23 @@ export default function HomeTab({
 
     return ledgerData
       .filter(item => {
-        const itemDate =
-          item.date ||
-          item.day ||
-          item.dateKey ||
-          '';
+        if (!item || item.isSaving) return false;
 
-        return String(itemDate).slice(0, 10) === dateKey;
+        return toDay(item.datetime) === dateKey;
       })
       .reduce((sum, item) => {
-        const amount =
-          Number(item.amount) ||
-          Number(item.originalAmount) ||
-          0;
-
-        return sum + amount;
+        return sum + (Number(item.amount) || 0);
       }, 0);
   }, [ledgerData, dateKey]);
 
   // ─────────────────────────────────────────
   // 오늘의 할 일
-  // 데이터 구조가 달라도 최대한 안전하게 계산
+  // daily + work
   // ─────────────────────────────────────────
 
   const todoCount = useMemo(() => {
     const data = todoData || {};
+
     let total = 0;
     let completed = 0;
 
@@ -72,7 +66,7 @@ export default function HomeTab({
       });
     };
 
-    // 오늘 날짜의 daily
+    // 오늘의 daily
     if (data.daily) {
       if (Array.isArray(data.daily)) {
         addItems(data.daily);
@@ -104,6 +98,35 @@ export default function HomeTab({
       remaining: Math.max(0, total - completed)
     };
   }, [todoData, dateKey]);
+
+  // ─────────────────────────────────────────
+  // 오늘의 루틴
+  // 할 일과 별도의 카드로 표시
+  // ─────────────────────────────────────────
+
+  const routineCount = useMemo(() => {
+    const routines = Array.isArray(todoData?.routines)
+      ? todoData.routines
+      : [];
+
+    let completed = 0;
+
+    routines.forEach(item => {
+      if (
+        item?.completed === true ||
+        item?.done === true ||
+        item?.checked === true
+      ) {
+        completed += 1;
+      }
+    });
+
+    return {
+      total: routines.length,
+      completed,
+      remaining: Math.max(0, routines.length - completed)
+    };
+  }, [todoData]);
 
   // ─────────────────────────────────────────
   // 오늘의 일기
@@ -325,6 +348,115 @@ export default function HomeTab({
           }}
         >
           {todoCount.completed}건 완료
+        </div>
+      </button>
+
+
+      {/* ─────────────────────────────────────
+          오늘의 루틴
+      ───────────────────────────────────── */}
+
+      <button
+        onClick={() => go('todo')}
+        style={{
+          ...card,
+          width: '100%',
+          textAlign: 'left',
+          marginBottom: 12,
+          cursor: 'pointer'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: 12,
+                color: 'var(--sub)',
+                marginBottom: 7
+              }}
+            >
+              오늘의 루틴
+            </div>
+
+            <div
+              style={{
+                fontFamily:
+                  "'Noto Serif KR','Batang',serif",
+                fontSize: 23,
+                fontWeight: 700
+              }}
+            >
+              {routineCount.remaining}
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 400,
+                  marginLeft: 4
+                }}
+              >
+                건 남음
+              </span>
+            </div>
+          </div>
+
+          <div
+            style={{
+              width: 43,
+              height: 43,
+              borderRadius: '50%',
+              background: 'var(--accent-bg)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--accent)',
+              fontSize: 19
+            }}
+          >
+            ↻
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 13,
+            height: 5,
+            background: 'var(--bg)',
+            borderRadius: 10,
+            overflow: 'hidden'
+          }}
+        >
+          <div
+            style={{
+              width:
+                routineCount.total > 0
+                  ? `${Math.min(
+                      100,
+                      (routineCount.completed /
+                        routineCount.total) *
+                        100
+                    )}%`
+                  : '0%',
+              height: '100%',
+              background: 'var(--accent)',
+              borderRadius: 10
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            marginTop: 7,
+            fontSize: 10,
+            color: 'var(--sub)'
+          }}
+        >
+          {routineCount.completed}건 완료
         </div>
       </button>
 
