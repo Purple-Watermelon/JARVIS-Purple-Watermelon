@@ -422,7 +422,7 @@ export default function App() {
         >
           <button
             onClick={() =>
-              setTab('todo')
+              setTab('home')
             }
             style={{
               display: 'flex',
@@ -616,25 +616,7 @@ export default function App() {
             '5px 4px calc(5px + env(safe-area-inset-bottom))'
         }}
       >
-      <nav
-  style={{
-    position: 'fixed',
-    bottom: 0,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    width: '100%',
-    maxWidth: 480,
-    background: 'rgba(255,253,251,0.96)',
-    backdropFilter: 'blur(14px)',
-    borderTop: '1px solid var(--border)',
-    display: 'flex',
-    zIndex: 100,
-    padding:
-      '6px 12px calc(6px + env(safe-area-inset-bottom))',
-    gap: 8
-  }}
->
-
+     
   {/* 메뉴 */}
 
   <button
