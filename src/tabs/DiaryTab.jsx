@@ -616,39 +616,61 @@ export default function DiaryTab({
     }
   };
 
-  // ─────────────────────────────────────────────
-  // 사진 삭제
-  // ─────────────────────────────────────────────
-  const removeImageBlock = blockId => {
-    const confirmed = window.confirm(
-      '이 사진을 일기에서 삭제할까요?\n\n저장하면 일기에서도 사라져요.'
+ // ─────────────────────────────────────────────
+// 사진 삭제
+// ─────────────────────────────────────────────
+const removeImageBlock = blockId => {
+  const confirmed = window.confirm(
+    '이 사진을 일기에서 삭제할까요?\n\n저장하면 일기에서도 사라져요.'
+  );
+
+  if (!confirmed) return;
+
+  setDraft(prev => {
+    const imageIndex = prev.blocks.findIndex(
+      block => block.id === blockId
     );
 
-    if (!confirmed) return;
+    if (imageIndex === -1) {
+      return prev;
+    }
 
-    setDraft(prev => {
-      let blocks = prev.blocks.filter(
-        block => block.id !== blockId
-      );
+    const blocks = [...prev.blocks];
 
-      if (
-        !blocks.some(
-          block => block.type === 'text'
-        )
-      ) {
-        blocks.push({
-          id: uid(),
-          type: 'text',
-          content: '',
-        });
-      }
+    // 사진 삭제
+    blocks.splice(imageIndex, 1);
 
-      return {
-        ...prev,
-        blocks,
-      };
-    });
-  };
+    // 사진 바로 뒤에 자동으로 만들어진
+    // 빈 글 입력칸이 있으면 같이 삭제
+    const nextBlock = blocks[imageIndex];
+
+    if (
+      nextBlock &&
+      nextBlock.type === 'text' &&
+      !(nextBlock.content || '').trim()
+    ) {
+      blocks.splice(imageIndex, 1);
+    }
+
+    // 글 입력칸이 하나도 없으면 하나만 만들어준다.
+    if (
+      !blocks.some(
+        block => block.type === 'text'
+      )
+    ) {
+      blocks.push({
+        id: uid(),
+        type: 'text',
+        content: ''
+      });
+    }
+
+    return {
+      ...prev,
+      blocks
+    };
+  });
+};
 
   // ─────────────────────────────────────────────
   // 저장
