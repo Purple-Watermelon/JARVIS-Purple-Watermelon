@@ -1,325 +1,1322 @@
-import { useState } from 'react';
-import { DAYS } from '../utils/helpers';
+import { useState, useRef, useEffect } from 'react';
+import { uid, fmtDate, Store } from '../utils/helpers';
+import { CalendarOverlay, Modal, SaveBtn } from '../components/UI';
 
-// ── Card ───────────────────────────────────────────────────────────────
-export function Card({ children, style = {} }) {
-  return (
-    <div style={{
-      background: 'var(--card)', borderRadius: 16,
-      padding: 16, border: '1.5px solid var(--border)', boxShadow: 'none',
-      ...style
-    }}>
-      {children}
-    </div>
-  );
-}
+const EMOTIONS = [
+  { emoji: '🐷❤️', label: '행복' },
+  { emoji: '😊', label: '좋음' },
+  { emoji: '😐', label: '평범' },
+  { emoji: '😢', label: '슬픔' },
+  { emoji: '😤', label: '화남' },
+  { emoji: '😴', label: '지침' },
+];
 
-// ── Section header ─────────────────────────────────────────────────────
-export function SectionHeader({ icon, title, color, count }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9, paddingLeft: 2 }}>
-      <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
-      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sub)', letterSpacing: 0.4 }}>{icon} {title}</span>
-      {count !== undefined && (
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--sub)', background: 'var(--border)', borderRadius: 10, padding: '1px 7px' }}>{count}</span>
-      )}
-    </div>
-  );
-}
+export default function DiaryTab({
+  data,
+  setData,
+  saveDiaryEntry,
+  unlocked,
+  setUnlocked
+}) {
+  const today = new Date();
 
-// ── Bottom Sheet Modal ─────────────────────────────────────────────────
-export function Modal({ title, onClose, children }) {
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(26,20,40,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
-      onClick={onClose}
-    >
+  const [date, setDate] = useState(today);
+  const [showCal, setShowCal] = useState(false);
+  const [viewPhoto, setViewPhoto] = useState(null);
+
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState(false);
+
+  const [showSetPin, setShowSetPin] = useState(false);
+  const [newPin, setNewPin] = useState('');
+  const [newPinConfirm, setNewPinConfirm] = useState('');
+
+  const [uploading, setUploading] = useState(false);
+
+  const fileRef = useRef();
+
+  const { y, m, day, dow, key } = fmtDate(date);
+
+  const entries = data || {};
+  const savedEntry = entries[key] || null;
+
+  const savedPin = Store.get('jarvis-pin');
+
+  // ============================================================
+  // 편집용 임시 상태
+  // ============================================================
+
+  const [draft, setDraft] = useState({
+    title: '',
+    emotion: '',
+    text: '',
+    photos: []
+  });
+
+  // 날짜가 바뀌거나 저장된 데이터가 바뀌면
+  // 해당 날짜의 데이터를 다시 불러온다.
+  useEffect(() => {
+    const e = entries[key] || null;
+
+    setDraft({
+      title: e?.title || '',
+      emotion: e?.emotion || '',
+      text: e?.text || '',
+      photos: (e?.photos || []).map(p => ({
+        id: p.id,
+        src: p.src,
+        comment: p.comment || ''
+      }))
+    });
+
+    setViewPhoto(null);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, savedEntry]);
+
+  // ============================================================
+  // PIN
+  // ============================================================
+
+  const tapPin = d => {
+    if (pin.length >= 4) return;
+
+    const next = pin + d;
+
+    setPin(next);
+
+    if (next.length === 4) {
+      const sp = Store.get('jarvis-pin');
+
+      if (!sp || next === sp) {
+        setTimeout(() => {
+          setUnlocked(true);
+          setPin('');
+        }, 150);
+      } else {
+        setTimeout(() => {
+          setPin('');
+          setPinError(true);
+
+          setTimeout(() => {
+            setPinError(false);
+          }, 800);
+        }, 300);
+      }
+    }
+  };
+
+  // ============================================================
+  // 잠금 화면
+  // ============================================================
+
+  if (!unlocked) {
+    return (
       <div
-        style={{ background: 'var(--card)', borderRadius: '22px 22px 0 0', padding: '20px 20px calc(20px + env(safe-area-inset-bottom))', width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}
-        onClick={e => e.stopPropagation()}
+        style={{
+          minHeight: '70vh',
+          padding: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>{title}</span>
-          <button onClick={onClose} style={{ color: 'var(--sub)', fontSize: 22, lineHeight: 1, padding: 4 }}>×</button>
+        <div
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: 22,
+            background: 'var(--accent-bg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 38,
+            marginBottom: 16
+          }}
+        >
+          📓
         </div>
-        {children}
+
+        <div
+          style={{
+            fontSize: 21,
+            fontWeight: 800,
+            color: 'var(--text)',
+            marginBottom: 6
+          }}
+        >
+          일기장 잠금
+        </div>
+
+        <div
+          style={{
+            fontSize: 13,
+            color: 'var(--sub)',
+            textAlign: 'center',
+            lineHeight: 1.6,
+            marginBottom: 30,
+            whiteSpace: 'pre-line'
+          }}
+        >
+          {savedPin
+            ? 'PIN 4자리를 입력하세요'
+            : '처음 사용 시 아무 PIN이나 입력하면\n그 번호가 PIN으로 설정돼요'}
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            gap: 14,
+            marginBottom: 34
+          }}
+        >
+          {[0, 1, 2, 3].map(i => (
+            <div
+              key={i}
+              style={{
+                width: 13,
+                height: 13,
+                borderRadius: '50%',
+                background:
+                  pin.length > i
+                    ? pinError
+                      ? 'var(--red)'
+                      : 'var(--accent)'
+                    : 'var(--border)',
+                transition: 'background 0.2s'
+              }}
+            />
+          ))}
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3,72px)',
+            gap: 12
+          }}
+        >
+          {[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((d, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                if (d === '⌫') {
+                  setPin(p => p.slice(0, -1));
+                } else if (d !== '') {
+                  tapPin(String(d));
+                }
+              }}
+              style={{
+                height: 68,
+                borderRadius: 16,
+                border:
+                  d === ''
+                    ? 'none'
+                    : '1.5px solid var(--border)',
+                background:
+                  d === ''
+                    ? 'transparent'
+                    : 'var(--card)',
+                color:
+                  d === '⌫'
+                    ? 'var(--sub)'
+                    : 'var(--text)',
+                fontSize:
+                  d === '⌫'
+                    ? 20
+                    : 23,
+                fontWeight: 600,
+                boxShadow:
+                  d === ''
+                    ? 'none'
+                    : '0 2px 8px rgba(124,92,191,0.08)',
+                cursor:
+                  d === ''
+                    ? 'default'
+                    : 'pointer'
+              }}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-// ── Calendar Overlay ───────────────────────────────────────────────────
-export function CalendarOverlay({ current, onSelect, onClose, dotKeys = [] }) {
-  const [view, setView] = useState(new Date(current.y, current.m - 1, 1));
-  const y = view.getFullYear(), m = view.getMonth();
-  const firstDay = new Date(y, m, 1).getDay();
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const todayKey = (() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
-  const curKey = `${current.y}-${String(current.m).padStart(2,'0')}-${String(current.day).padStart(2,'0')}`;
+  // ============================================================
+  // 입력 helper
+  // ============================================================
+
+  const D = (k, v) => {
+    setDraft(prev => ({
+      ...prev,
+      [k]: v
+    }));
+  };
+
+  // ============================================================
+  // 이미지 압축
+  // ============================================================
+
+  const compressImage = file =>
+    new Promise(resolve => {
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = e => {
+        img.src = e.target.result;
+      };
+
+      img.onload = () => {
+        const MAX = 1600;
+
+        let { width, height } = img;
+
+        if (width > height && width > MAX) {
+          height = height * MAX / width;
+          width = MAX;
+        } else if (height > MAX) {
+          width = width * MAX / height;
+          height = MAX;
+        }
+
+        const canvas = document.createElement('canvas');
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          width,
+          height
+        );
+
+        canvas.toBlob(
+          blob => resolve(blob || file),
+          'image/jpeg',
+          0.8
+        );
+      };
+
+      img.onerror = () => resolve(file);
+
+      reader.readAsDataURL(file);
+    });
+
+  // ============================================================
+  // Cloudinary 업로드
+  // ============================================================
+
+  const uploadToCloudinary = async file => {
+    const formData = new FormData();
+
+    formData.append('file', file);
+
+    formData.append(
+      'upload_preset',
+      process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET
+    );
+
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        body: formData
+      }
+    );
+
+    const result = await res.json();
+
+    if (!res.ok || !result.secure_url) {
+      throw new Error(
+        result?.error?.message ||
+        '사진 업로드에 실패했습니다.'
+      );
+    }
+
+    return result.secure_url;
+  };
+
+  // ============================================================
+  // 사진 선택
+  // ============================================================
+
+  const pickPhotos = files => {
+    if (!files || !files.length) return;
+
+    const added = Array.from(files)
+      .filter(file => file.type.startsWith('image/'))
+      .map(file => ({
+        id: uid(),
+        file,
+        preview: URL.createObjectURL(file),
+        comment: ''
+      }));
+
+    setDraft(prev => ({
+      ...prev,
+      photos: [
+        ...prev.photos,
+        ...added
+      ]
+    }));
+  };
+
+  // ============================================================
+  // 사진 삭제
+  // ============================================================
+
+  const removeDraftPhoto = photoId => {
+    const target = draft.photos.find(
+      ph => ph.id === photoId
+    );
+
+    if (!target) return;
+
+    if (
+      !window.confirm(
+        '이 사진을 삭제하시겠습니까?\n\n저장하면 해당 사진은 일기에서 사라집니다.'
+      )
+    ) {
+      return;
+    }
+
+    if (target.preview) {
+      URL.revokeObjectURL(target.preview);
+    }
+
+    setDraft(prev => ({
+      ...prev,
+      photos: prev.photos.filter(
+        ph => ph.id !== photoId
+      )
+    }));
+  };
+
+  // ============================================================
+  // 사진 코멘트
+  // ============================================================
+
+  const setPhotoComment = (photoId, comment) => {
+    setDraft(prev => ({
+      ...prev,
+      photos: prev.photos.map(ph =>
+        ph.id === photoId
+          ? {
+              ...ph,
+              comment
+            }
+          : ph
+      )
+    }));
+  };
+
+  // ============================================================
+  // 저장
+  // ============================================================
+
+  const handleSave = async () => {
+    if (uploading) return;
+
+    setUploading(true);
+
+    try {
+      const finalPhotos = await Promise.all(
+        draft.photos.map(async ph => {
+
+          // 기존 사진
+          if (ph.src) {
+            return {
+              id: ph.id,
+              src: ph.src,
+              comment: ph.comment || ''
+            };
+          }
+
+          // 새 사진
+          if (!ph.file) {
+            return null;
+          }
+
+          const compressed =
+            await compressImage(ph.file);
+
+          const url =
+            await uploadToCloudinary(compressed);
+
+          return {
+            id: ph.id,
+            src: url,
+            comment: ph.comment || ''
+          };
+        })
+      );
+
+      const entry = {
+        date: key,
+        title: draft.title || '',
+        emotion: draft.emotion || '',
+        text: draft.text || '',
+        photos: finalPhotos.filter(Boolean)
+      };
+
+      // ⭐ 핵심:
+      // 전체 diary를 덮어쓰지 않고
+      // 현재 날짜 하나만 저장한다.
+      await saveDiaryEntry(
+        key,
+        entry
+      );
+
+      alert('저장됐어요! 🐷');
+
+    } catch (err) {
+      console.error(
+        'Diary 저장 실패:',
+        err
+      );
+
+      alert(
+        '저장에 실패했어요.\n\n' +
+        '기존 일기는 변경되지 않았어요.\n' +
+        '인터넷 연결을 확인하고 다시 시도해주세요.'
+      );
+
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // ============================================================
+  // 날짜 이동
+  // ============================================================
+
+  const moveDate = amount => {
+    const next = new Date(date);
+
+    next.setDate(
+      next.getDate() + amount
+    );
+
+    setDate(next);
+  };
+
+  const goToday = () => {
+    setDate(new Date());
+  };
+
+  const photoSrc = ph =>
+    ph.src || ph.preview;
+
+  const hasContent =
+    draft.title.trim() ||
+    draft.emotion ||
+    draft.text.trim() ||
+    draft.photos.length > 0;
+
+  const todayKey =
+    `${today.getFullYear()}-${String(
+      today.getMonth() + 1
+    ).padStart(2, '0')}-${String(
+      today.getDate()
+    ).padStart(2, '0')}`;
+
+  const isToday = key === todayKey;
+
+  // ============================================================
+  // 화면
+  // ============================================================
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(26,20,40,0.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-      onClick={onClose}
+      style={{
+        padding: 16,
+        paddingBottom: 100
+      }}
     >
+
+      {/* 저장 중 */}
+      {uploading && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.4)',
+            zIndex: 500,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--card)',
+              borderRadius: 18,
+              padding: '26px 34px',
+              textAlign: 'center',
+              boxShadow:
+                '0 10px 40px rgba(0,0,0,0.2)'
+            }}
+          >
+            <div
+              style={{
+                fontSize: 32,
+                marginBottom: 8
+              }}
+            >
+              💾
+            </div>
+
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 800
+              }}
+            >
+              저장하는 중...
+            </div>
+
+            <div
+              style={{
+                fontSize: 12,
+                color: 'var(--sub)',
+                marginTop: 5
+              }}
+            >
+              사진이 있다면 조금만 기다려주세요 🐷
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 날짜 */}
       <div
-        style={{ background: 'var(--card)', borderRadius: 22, padding: 22, width: '100%', maxWidth: 340, boxShadow: '0 8px 32px rgba(124,92,191,0.2)' }}
-        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--card)',
+          border: '1.5px solid var(--border)',
+          borderRadius: 18,
+          padding: '12px 10px',
+          marginBottom: 14
+        }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <button onClick={() => setView(new Date(y, m - 1, 1))} style={{ fontSize: 22, color: 'var(--accent)', padding: '4px 10px' }}>‹</button>
-          <span style={{ fontSize: 15, fontWeight: 700 }}>{y}년 {m + 1}월</span>
-          <button onClick={() => setView(new Date(y, m + 1, 1))} style={{ fontSize: 22, color: 'var(--accent)', padding: '4px 10px' }}>›</button>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center'
+          }}
+        >
+
+          <button
+            onClick={() => moveDate(-1)}
+            style={{
+              width: 42,
+              height: 42,
+              border: 'none',
+              borderRadius: 12,
+              background: 'var(--accent-bg)',
+              color: 'var(--accent)',
+              fontSize: 27,
+              cursor: 'pointer'
+            }}
+          >
+            ‹
+          </button>
+
+          <button
+            onClick={() => setShowCal(true)}
+            style={{
+              flex: 1,
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer'
+            }}
+          >
+            <div
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                color: 'var(--text)',
+                lineHeight: 1.2
+              }}
+            >
+              {m}월 {day}일
+            </div>
+
+            <div
+              style={{
+                fontSize: 12,
+                color: 'var(--accent)',
+                fontWeight: 700,
+                marginTop: 4
+              }}
+            >
+              {y} · {dow}요일
+            </div>
+          </button>
+
+          <button
+            onClick={() => moveDate(1)}
+            style={{
+              width: 42,
+              height: 42,
+              border: 'none',
+              borderRadius: 12,
+              background: 'var(--accent-bg)',
+              color: 'var(--accent)',
+              fontSize: 27,
+              cursor: 'pointer'
+            }}
+          >
+            ›
+          </button>
+
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginBottom: 6 }}>
-          {DAYS.map(d => <div key={d} style={{ textAlign: 'center', fontSize: 10, color: 'var(--sub)', padding: '4px 0', fontWeight: 600 }}>{d}</div>)}
+
+        {!isToday && (
+          <button
+            onClick={goToday}
+            style={{
+              display: 'block',
+              margin: '8px auto 0',
+              border: 'none',
+              background: 'none',
+              color: 'var(--accent)',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            오늘로 돌아가기
+          </button>
+        )}
+
+        {savedEntry && (
+          <div
+            style={{
+              marginTop: 9,
+              textAlign: 'center',
+              fontSize: 10,
+              color: 'var(--sub)'
+            }}
+          >
+            ● 저장된 일기가 있어요
+          </div>
+        )}
+      </div>
+
+      {/* PIN 변경 */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          marginBottom: 10
+        }}
+      >
+        <button
+          onClick={() => setShowSetPin(true)}
+          style={{
+            fontSize: 12,
+            color: 'var(--sub)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer'
+          }}
+        >
+          🔒 PIN 변경
+        </button>
+      </div>
+
+      {/* 제목 */}
+      <input
+        value={draft.title}
+        onChange={e =>
+          D('title', e.target.value)
+        }
+        placeholder="오늘의 제목을 적어보세요"
+        style={{
+          width: '100%',
+          border: 'none',
+          borderBottom:
+            '2px solid var(--border)',
+          background: 'transparent',
+          color: 'var(--text)',
+          fontSize: 21,
+          fontWeight: 800,
+          padding: '9px 2px',
+          marginBottom: 20,
+          outline: 'none',
+          boxSizing: 'border-box'
+        }}
+      />
+
+      {/* 감정 */}
+      <div
+        style={{
+          marginBottom: 20
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            color: 'var(--sub)',
+            marginBottom: 9,
+            fontWeight: 700
+          }}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'var(--accent)'
+            }}
+          />
+          오늘의 감정
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
-          {Array(firstDay).fill(null).map((_, i) => <div key={`e${i}`} />)}
-          {Array(daysInMonth).fill(null).map((_, i) => {
-            const day = i + 1;
-            const k = `${y}-${String(m + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-            const isToday = k === todayKey, isCur = k === curKey;
-            const hasDot = dotKeys.includes(k);
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns:
+              'repeat(3, 1fr)',
+            gap: 8
+          }}
+        >
+          {EMOTIONS.map(e => {
+            const active =
+              draft.emotion === e.label;
+
             return (
-              <button key={day} onClick={() => { onSelect(new Date(y, m, day)); onClose(); }} style={{
-                padding: '7px 2px', borderRadius: 8, cursor: 'pointer',
-                background: isCur ? 'var(--accent)' : isToday ? 'var(--accent-bg)' : 'transparent',
-                color: isCur ? '#fff' : isToday ? 'var(--accent)' : 'var(--text)',
-                fontWeight: isCur || isToday ? 700 : 400, fontSize: 12,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-              }}>
-                {day}
-                {hasDot && <span style={{ width: 3, height: 3, borderRadius: '50%', background: isCur ? 'rgba(255,255,255,0.6)' : 'var(--accent)', display: 'inline-block' }} />}
+              <button
+                key={e.label}
+                onClick={() =>
+                  D(
+                    'emotion',
+                    active
+                      ? ''
+                      : e.label
+                  )
+                }
+                style={{
+                  padding:
+                    '10px 6px',
+                  borderRadius: 13,
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  border:
+                    active
+                      ? '2px solid var(--accent)'
+                      : '1.5px solid var(--border)',
+                  background:
+                    active
+                      ? 'var(--accent-bg)'
+                      : 'var(--card)',
+                  transition:
+                    'all 0.15s'
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 21
+                  }}
+                >
+                  {e.emoji}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 11,
+                    color:
+                      active
+                        ? 'var(--accent)'
+                        : 'var(--sub)',
+                    marginTop: 3,
+                    fontWeight:
+                      active
+                        ? 800
+                        : 400
+                  }}
+                >
+                  {e.label}
+                </div>
               </button>
             );
           })}
         </div>
       </div>
-    </div>
-  );
-}
 
-// ── Month Navigator ────────────────────────────────────────────────────
-export function MonthNav({ ym, setYm }) {
-  const move = d => {
-    const [y, m] = ym.split('-').map(Number);
-    const dt = new Date(y, m - 1 + d, 1);
-    setYm(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2,'0')}`);
-  };
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 16 }}>
-      <button onClick={() => move(-1)} style={{ fontSize: 26, color: 'var(--accent)', padding: '2px 10px' }}>‹</button>
-      <span style={{ fontWeight: 700, fontSize: 17 }}>{ym}</span>
-      <button onClick={() => move(1)} style={{ fontSize: 26, color: 'var(--accent)', padding: '2px 10px' }}>›</button>
-    </div>
-  );
-}
+      {/* 본문 */}
+      <div
+        style={{
+          marginBottom: 20
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            color: 'var(--sub)',
+            marginBottom: 9,
+            fontWeight: 700
+          }}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'var(--accent)'
+            }}
+          />
+          오늘 하루
+        </div>
 
-// ── Save Button ────────────────────────────────────────────────────────
-export function SaveBtn({ onClick, label = '저장', disabled = false }) {
-  return (
-    <button onClick={onClick} disabled={disabled} style={{
-      width: '100%', borderRadius: 14, padding: '14px',
-      fontWeight: 700, fontSize: 15, marginTop: 8,
-      background: disabled ? 'var(--border)' : 'var(--accent)',
-      color: disabled ? 'var(--sub)' : '#fff',
-    }}>{label}</button>
-  );
-}
-
-// ── Add Row Button ─────────────────────────────────────────────────────
-export function AddRowBtn({ onClick, label = '+ 추가하기' }) {
-  return (
-    <button onClick={onClick} style={{
-      width: '100%', padding: '10px 16px', fontSize: 12,
-      color: 'var(--sub)', background: 'none', border: 'none',
-      cursor: 'pointer', textAlign: 'left', opacity: 0.8,
-    }}>{label}</button>
-  );
-}
-
-// ── Amount input with comma formatting ────────────────────────────────
-export function AmountInput({ value, onChange, placeholder = '0' }) {
-  const display = value ? Number(value).toLocaleString('ko-KR') : '';
-  return (
-    <input
-      inputMode="numeric"
-      placeholder={placeholder}
-      value={display}
-      onChange={e => {
-        const raw = e.target.value.replace(/[^0-9]/g, '');
-        onChange(raw ? parseInt(raw, 10) : '');
-      }}
-    />
-  );
-}
-
-// ── AM/PM Time Picker ──────────────────────────────────────────────────
-export function TimePicker({ value, onChange }) {
-  // value: { ampm, hour, min }
-  const v = value || { ampm: '오전', hour: 9, min: 0 };
-  const hours = Array.from({ length: 12 }, (_, i) => i + 1);
-  const mins = [0, 10, 20, 30, 40, 50];
-
-  const Btn = ({ active, onClick, children }) => (
-    <button onClick={onClick} style={{
-      padding: '6px 10px', borderRadius: 8, fontSize: 13,
-      background: active ? 'var(--accent)' : 'var(--bg)',
-      color: active ? '#fff' : 'var(--sub)',
-      fontWeight: active ? 700 : 400, border: '1px solid var(--border)',
-    }}>{children}</button>
-  );
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 6 }}>
-        {['오전','오후'].map(ap => (
-          <Btn key={ap} active={v.ampm === ap} onClick={() => onChange({ ...v, ampm: ap })}>{ap}</Btn>
-        ))}
+        <textarea
+          value={draft.text}
+          onChange={e =>
+            D('text', e.target.value)
+          }
+          placeholder="오늘은 어떤 하루였나요? ✍️"
+          style={{
+            width: '100%',
+            border:
+              '1.5px solid var(--border)',
+            borderRadius: 14,
+            padding: 13,
+            fontSize: 14,
+            lineHeight: 1.85,
+            minHeight: 170,
+            outline: 'none',
+            background: 'var(--card)',
+            color: 'var(--text)',
+            resize: 'none',
+            boxSizing: 'border-box',
+            fontFamily: 'inherit'
+          }}
+        />
       </div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {hours.map(h => (
-          <Btn key={h} active={v.hour === h} onClick={() => onChange({ ...v, hour: h })}>{h}시</Btn>
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        {mins.map(mn => (
-          <Btn key={mn} active={v.min === mn} onClick={() => onChange({ ...v, min: mn })}>{String(mn).padStart(2,'0')}분</Btn>
-        ))}
-      </div>
-    </div>
-  );
-}
 
-// ── Donut Chart (pure SVG) ─────────────────────────────────────────────
-// data: [{ label, value, color }]
-// showLabels=true 면 바깥쪽에 "이름 %" 표시
-// centerLabel 있으면 가운데에 총액 등 표시
-export function DonutChart({ data, size = 160, showLabels = false, centerLabel = null, centerSub = null }) {
-  const total = data.reduce((s, d) => s + d.value, 0);
-  if (!total) return null;
+      {/* 사진 */}
+      {draft.photos.length > 0 && (
+        <div
+          style={{
+            marginBottom: 16
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+              color: 'var(--sub)',
+              marginBottom: 9,
+              fontWeight: 700
+            }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'var(--accent)'
+              }}
+            />
 
-  // showLabels일 때는 바깥 글씨 공간이 필요해서 viewBox를 키움
-  const VB = showLabels ? 200 : 120;     // viewBox 크기
-  const cx = VB / 2, cy = VB / 2;        // 중심점
-  const r = showLabels ? 58 : 50;        // 도넛 반지름
-  const labelR = r + 14;                 // 라벨이 놓일 반지름(도넛 바깥)
+            오늘의 사진
 
-  let cumAngle = -Math.PI / 2;           // 12시 방향에서 시작
-  const slices = data.map(d => {
-    const angle = (d.value / total) * 2 * Math.PI;
-    const startA = cumAngle;
-    const x1 = cx + r * Math.cos(cumAngle);
-    const y1 = cy + r * Math.sin(cumAngle);
-    cumAngle += angle;
-    const x2 = cx + r * Math.cos(cumAngle);
-    const y2 = cy + r * Math.sin(cumAngle);
-    const large = angle > Math.PI ? 1 : 0;
-    const path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
-    // 라벨 위치 = 이 조각의 중간 각도
-    const midA = startA + angle / 2;
-    const lx = cx + labelR * Math.cos(midA);
-    const ly = cy + labelR * Math.sin(midA);
-    const pct = Math.round((d.value / total) * 100);
-    return { ...d, path, lx, ly, midA, pct };
-  });
+            <span
+              style={{
+                fontSize: 10,
+                color: 'var(--sub)'
+              }}
+            >
+              {draft.photos.length}장
+            </span>
+          </div>
 
-  return (
-    <svg viewBox={`0 0 ${VB} ${VB}`} width={size} height={size}>
-      {/* 도넛 조각들 */}
-      {slices.map((s, i) => (
-        <path key={i} d={s.path} fill={s.color} opacity={0.88} />
-      ))}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14
+            }}
+          >
+            {draft.photos.map(photo => (
+              <div
+                key={photo.id}
+                style={{
+                  position: 'relative',
+                  background: '#fff',
+                  borderRadius: 5,
+                  padding:
+                    '12px 12px 9px',
+                  boxShadow:
+                    '0 4px 16px rgba(0,0,0,0.12)'
+                }}
+              >
 
-      {/* 가운데 구멍 */}
-      <circle cx={cx} cy={cy} r={showLabels ? 34 : 28} fill="var(--card)" />
+                <button
+                  onClick={() =>
+                    removeDraftPhoto(
+                      photo.id
+                    )
+                  }
+                  style={{
+                    position: 'absolute',
+                    top: 7,
+                    right: 7,
+                    zIndex: 2,
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    border: 'none',
+                    background:
+                      'rgba(0,0,0,0.58)',
+                    color: '#fff',
+                    fontSize: 17,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  ×
+                </button>
 
-      {/* 가운데 글씨 (총액 등) */}
-      {centerLabel && (
-        <text x={cx} y={cy - (centerSub ? 2 : 0)} textAnchor="middle"
-          fontSize={showLabels ? 13 : 11} fontWeight="800" fill="var(--text)">
-          {centerLabel}
-        </text>
+                <img
+                  src={photoSrc(photo)}
+                  alt=""
+                  onClick={() =>
+                    setViewPhoto(photo)
+                  }
+                  style={{
+                    width: '100%',
+                    aspectRatio: '4/3',
+                    objectFit: 'cover',
+                    borderRadius: 3,
+                    cursor: 'pointer',
+                    display: 'block'
+                  }}
+                />
+
+                <textarea
+                  value={
+                    photo.comment || ''
+                  }
+                  onChange={e =>
+                    setPhotoComment(
+                      photo.id,
+                      e.target.value
+                    )
+                  }
+                  placeholder="사진에 코멘트를 남겨보세요..."
+                  rows={1}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: 12,
+                    color: '#555',
+                    marginTop: 8,
+                    background:
+                      'transparent',
+                    textAlign: 'center',
+                    fontStyle: 'italic',
+                    resize: 'none',
+                    fontFamily:
+                      'inherit',
+                    lineHeight: 1.6,
+                    boxSizing:
+                      'border-box',
+                    overflow: 'hidden',
+                    display: 'block'
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       )}
-      {centerSub && (
-        <text x={cx} y={cy + 12} textAnchor="middle"
-          fontSize={9} fill="var(--sub)">
-          {centerSub}
-        </text>
+
+      {/* 사진 추가 */}
+      <button
+        onClick={() =>
+          fileRef.current?.click()
+        }
+        style={{
+          width: '100%',
+          marginBottom: 16,
+          padding: 13,
+          borderRadius: 13,
+          border:
+            '1.5px dashed var(--border)',
+          color: 'var(--sub)',
+          fontSize: 13,
+          background: 'transparent',
+          cursor: 'pointer'
+        }}
+      >
+        📸 사진 추가하기
+      </button>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        multiple
+        style={{
+          display: 'none'
+        }}
+        onChange={e => {
+          pickPhotos(e.target.files);
+          e.target.value = '';
+        }}
+      />
+
+      {/* 저장 */}
+      <SaveBtn
+        onClick={handleSave}
+        disabled={
+          !hasContent ||
+          uploading
+        }
+        label={
+          uploading
+            ? '저장하는 중...'
+            : '저장하기'
+        }
+      />
+
+      {/* 달력 */}
+      {showCal && (
+        <CalendarOverlay
+          current={{
+            y,
+            m,
+            day
+          }}
+          onSelect={setDate}
+          onClose={() =>
+            setShowCal(false)
+          }
+          dotKeys={
+            Object.keys(entries)
+          }
+        />
       )}
 
-      {/* 바깥쪽 라벨 (이름 + %) */}
-      {showLabels && slices.map((s, i) => {
-        // 라벨이 오른쪽이면 왼쪽정렬, 왼쪽이면 오른쪽정렬 (글씨가 도넛 밖으로 향하게)
-        const isRight = Math.cos(s.midA) >= 0;
-        // 너무 작은 조각(3% 미만)은 글씨 겹치니까 생략
-        if (s.pct < 3) return null;
-        return (
-          <text key={`l${i}`} x={s.lx} y={s.ly}
-            textAnchor={isRight ? 'start' : 'end'}
-            dominantBaseline="middle"
-            fontSize={8} fontWeight="600" fill="var(--text)">
-            {s.label} {s.pct}%
-          </text>
-        );
-      })}
-    </svg>
-  );
-}
+      {/* 사진 확대 */}
+      {viewPhoto && (
+        <div
+          onClick={() =>
+            setViewPhoto(null)
+          }
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background:
+              'rgba(0,0,0,0.92)',
+            zIndex: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+            cursor: 'zoom-out'
+          }}
+        >
+          <img
+            src={photoSrc(viewPhoto)}
+            alt=""
+            style={{
+              maxWidth: '100%',
+              maxHeight: '82vh',
+              borderRadius: 8,
+              objectFit: 'contain'
+            }}
+          />
+        </div>
+      )}
 
+      {/* PIN 변경 */}
+      {showSetPin && (
+        <Modal
+          title="🔒 PIN 변경"
+          onClose={() => {
+            setShowSetPin(false);
+            setNewPin('');
+            setNewPinConfirm('');
+          }}
+        >
+          <div
+            style={{
+              marginBottom: 12
+            }}
+          >
+            <label
+              style={{
+                fontSize: 11,
+                color: 'var(--sub)',
+                fontWeight: 600,
+                display: 'block',
+                marginBottom: 5
+              }}
+            >
+              새 PIN (4자리)
+            </label>
 
-// ── PIN Lock Overlay ───────────────────────────────────────────────────
-export function PinLock({ onUnlock }) {
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState(false);
-  const CORRECT = Store_get('jarvis-pin') || '0000';
+            <input
+              style={{
+                width: '100%',
+                border:
+                  '1.5px solid var(--border)',
+                borderRadius: 10,
+                padding:
+                  '10px 12px',
+                fontSize: 14,
+                background:
+                  'var(--card)',
+                color:
+                  'var(--text)',
+                outline: 'none',
+                letterSpacing: 8,
+                boxSizing:
+                  'border-box'
+              }}
+              type="password"
+              maxLength={4}
+              inputMode="numeric"
+              value={newPin}
+              onChange={e =>
+                setNewPin(
+                  e.target.value.replace(
+                    /[^0-9]/g,
+                    ''
+                  )
+                )
+              }
+              placeholder="••••"
+            />
+          </div>
 
-  function Store_get(k) {
-    try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch(_) { return null; }
-  }
+          <div
+            style={{
+              marginBottom: 12
+            }}
+          >
+            <label
+              style={{
+                fontSize: 11,
+                color: 'var(--sub)',
+                fontWeight: 600,
+                display: 'block',
+                marginBottom: 5
+              }}
+            >
+              PIN 확인
+            </label>
 
-  const tap = d => {
-    if (pin.length >= 4) return;
-    const next = pin + d;
-    setPin(next);
-    if (next.length === 4) {
-      const saved = Store_get('jarvis-pin');
-      if (!saved || next === saved) {
-        setTimeout(onUnlock, 150);
-      } else {
-        setTimeout(() => { setPin(''); setError(true); setTimeout(() => setError(false), 1000); }, 300);
-      }
-    }
-  };
+            <input
+              style={{
+                width: '100%',
+                border:
+                  '1.5px solid var(--border)',
+                borderRadius: 10,
+                padding:
+                  '10px 12px',
+                fontSize: 14,
+                background:
+                  'var(--card)',
+                color:
+                  'var(--text)',
+                outline: 'none',
+                letterSpacing: 8,
+                boxSizing:
+                  'border-box'
+              }}
+              type="password"
+              maxLength={4}
+              inputMode="numeric"
+              value={newPinConfirm}
+              onChange={e =>
+                setNewPinConfirm(
+                  e.target.value.replace(
+                    /[^0-9]/g,
+                    ''
+                  )
+                )
+              }
+              placeholder="••••"
+            />
+          </div>
 
-  const del = () => setPin(p => p.slice(0, -1));
+          {newPin &&
+            newPinConfirm &&
+            newPin !==
+              newPinConfirm && (
+              <div
+                style={{
+                  color:
+                    'var(--red)',
+                  fontSize: 12,
+                  marginBottom: 8
+                }}
+              >
+                PIN이 일치하지 않아요
+              </div>
+            )}
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 500 }}>
-      <div style={{ fontSize: 40, marginBottom: 16 }}>📓</div>
-      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>일기장 잠금</div>
-      <div style={{ fontSize: 13, color: 'var(--sub)', marginBottom: 32 }}>PIN을 입력하세요</div>
-      <div style={{ display: 'flex', gap: 16, marginBottom: 40 }}>
-        {[0,1,2,3].map(i => (
-          <div key={i} style={{
-            width: 14, height: 14, borderRadius: '50%',
-            background: pin.length > i ? (error ? 'var(--red)' : 'var(--accent)') : 'var(--border)',
-            transition: 'background 0.2s',
-          }} />
-        ))}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,72px)', gap: 12 }}>
-        {[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((d, i) => (
-          <button key={i} onClick={() => d === '⌫' ? del() : d !== '' ? tap(String(d)) : null} style={{
-            height: 72, borderRadius: 16, fontSize: d === '⌫' ? 20 : 24, fontWeight: 600,
-            background: d === '' ? 'transparent' : 'var(--card)',
-            color: d === '⌫' ? 'var(--sub)' : 'var(--text)',
-            boxShadow: d === '' ? 'none' : '0 2px 8px rgba(124,92,191,0.1)',
-            border: '1.5px solid var(--border)',
-          }}>{d}</button>
-        ))}
-      </div>
+          <SaveBtn
+            onClick={() => {
+              if (
+                newPin.length === 4 &&
+                newPin ===
+                  newPinConfirm
+              ) {
+                Store.set(
+                  'jarvis-pin',
+                  newPin
+                );
+
+                setShowSetPin(false);
+                setNewPin('');
+                setNewPinConfirm('');
+
+                alert(
+                  'PIN이 변경됐어요!'
+                );
+              }
+            }}
+            disabled={
+              newPin.length !== 4 ||
+              newPin !==
+                newPinConfirm
+            }
+            label="PIN 저장"
+          />
+        </Modal>
+      )}
     </div>
   );
 }
