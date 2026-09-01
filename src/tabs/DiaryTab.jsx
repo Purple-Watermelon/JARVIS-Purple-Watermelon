@@ -11,68 +11,114 @@ const EMOTIONS = [
   { emoji: '😴', label: '지침' },
 ];
 
-/* ─────────────────────────────────────────────
-   기존 일기 → 새로운 blocks 구조로 변환
-   기존 데이터가 사라지지 않도록 호환
-───────────────────────────────────────────── */
-const makeBlocksFromEntry = (entry) => {
+const HAND_FONT = "'Gaegu', 'Nanum Pen Script', cursive";
+const PAPER_FONT = "'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif";
+
+/* ─────────────────────────────────────────
+   기존 일기 데이터 → blocks 구조
+───────────────────────────────────────── */
+
+const convertLegacyEntry = entry => {
   if (!entry) {
-    return [
-      {
-        id: uid(),
+    return {
+      title: '',
+      emotion: '',
+      blocks: [
+        {
+          id: uid(),
+          type: 'text',
+          content: '',
+        },
+      ],
+    };
+  }
+
+  if (Array.isArray(entry.blocks)) {
+    const blocks = entry.blocks.map(block => {
+      if (block.type === 'image') {
+        return {
+          id: block.id || uid(),
+          type: 'image',
+          src: block.src || '',
+          comment: block.comment || '',
+        };
+      }
+
+      return {
+        id: block.id || uid(),
         type: 'text',
-        text: '',
-      },
-    ];
+        content: block.content || '',
+      };
+    });
+
+    return {
+      title: entry.title || '',
+      emotion: entry.emotion || '',
+      blocks:
+        blocks.length > 0
+          ? blocks
+          : [
+              {
+                id: uid(),
+                type: 'text',
+                content: '',
+              },
+            ],
+    };
   }
 
-  // 새 구조
-  if (Array.isArray(entry.blocks) && entry.blocks.length > 0) {
-    return entry.blocks.map(block => ({
-      ...block,
-      id: block.id || uid(),
-    }));
-  }
-
-  // 기존 구조
   const blocks = [];
 
   if (entry.text) {
     blocks.push({
       id: uid(),
       type: 'text',
-      text: entry.text,
+      content: entry.text,
     });
   }
 
   if (Array.isArray(entry.photos)) {
     entry.photos.forEach(photo => {
+      if (!photo?.src) return;
+
       blocks.push({
         id: photo.id || uid(),
-        type: 'photo',
+        type: 'image',
         src: photo.src,
         comment: photo.comment || '',
       });
-
-      // 사진 아래에서 계속 글을 쓸 수 있도록
-      blocks.push({
-        id: uid(),
-        type: 'text',
-        text: '',
-      });
     });
   }
 
-  if (blocks.length === 0) {
+  if (!blocks.length) {
     blocks.push({
       id: uid(),
       type: 'text',
-      text: '',
+      content: '',
     });
   }
 
-  return blocks;
+  return {
+    title: entry.title || '',
+    emotion: entry.emotion || '',
+    blocks,
+  };
 };
+
+/* ─────────────────────────────────────────
+   자동 높이
+───────────────────────────────────────── */
+
+const resizeTextarea = el => {
+  if (!el) return;
+
+  el.style.height = 'auto';
+  el.style.height = `${Math.max(42, el.scrollHeight)}px`;
+};
+
+/* ─────────────────────────────────────────
+   Diary
+───────────────────────────────────────── */
 
 export default function DiaryTab({
   data,
@@ -96,181 +142,290 @@ export default function DiaryTab({
 
   const [uploading, setUploading] = useState(false);
 
+  const [aiReview, setAiReview] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const fileRef = useRef(null);
+  const pendingPhotoIndex = useRef(null);
+
+  const { y, m, day, dow, key } = fmtDate(date);
+
+  const entries = data || {};
+  const savedEntry = entries[key] || null;
+  const savedPin = Store.get('jarvis-pin');
+
   const [draft, setDraft] = useState({
     title: '',
     emotion: '',
     blocks: [],
   });
 
-  const [insertAfterIndex, setInsertAfterIndex] = useState(null);
+  /* ─────────────────────────────────────────
+     날짜 변경
+  ───────────────────────────────────────── */
 
-  const fileRef = useRef(null);
-  const textRefs = useRef({});
-
-  const { y, m, day, dow, key } = fmtDate(date);
-
-  const entries = data || {};
-  const savedEntry = entries[key] || null;
-
-  const savedPin = Store.get('jarvis-pin');
-
-  /* ─────────────────────────────────────────────
-     날짜가 바뀌면 해당 날짜 일기 불러오기
-  ───────────────────────────────────────────── */
   useEffect(() => {
-    const entry = entries[key] || null;
+    const converted = convertLegacyEntry(entries[key]);
 
-    setDraft({
-      title: entry?.title || '',
-      emotion: entry?.emotion || '',
-      blocks: makeBlocksFromEntry(entry),
-    });
+    setDraft(converted);
+
+    /*
+      AI 결과는 현재 실제 API 연결 전이므로
+      날짜가 바뀌면 임시 결과를 초기화한다.
+    */
+    setAiReview(null);
   }, [key, savedEntry]);
 
-  /* ─────────────────────────────────────────────
+  /* ─────────────────────────────────────────
      PIN
-  ───────────────────────────────────────────── */
-  const tapPin = (digit) => {
+  ───────────────────────────────────────── */
+
+  const tapPin = digit => {
     if (pin.length >= 4) return;
 
     const next = pin + digit;
     setPin(next);
 
-    if (next.length === 4) {
-      const storedPin = Store.get('jarvis-pin');
+    if (next.length !== 4) return;
 
-      if (!storedPin || next === storedPin) {
-        setTimeout(() => {
-          setUnlocked(true);
-          setPin('');
-        }, 150);
-      } else {
-        setTimeout(() => {
-          setPin('');
-          setPinError(true);
+    const saved = Store.get('jarvis-pin');
 
-          setTimeout(() => {
-            setPinError(false);
-          }, 800);
-        }, 300);
-      }
+    if (!saved || next === saved) {
+      setTimeout(() => {
+        setUnlocked(true);
+        setPin('');
+      }, 150);
+    } else {
+      setTimeout(() => {
+        setPin('');
+        setPinError(true);
+
+        setTimeout(() => {
+          setPinError(false);
+        }, 800);
+      }, 300);
     }
   };
 
-  /* ─────────────────────────────────────────────
+  /* ─────────────────────────────────────────
      PIN 잠금 화면
-  ───────────────────────────────────────────── */
+  ───────────────────────────────────────── */
+
   if (!unlocked) {
     return (
-      <div className="diary-lock-screen">
-        <div className="diary-paper diary-lock-paper">
-          <div className="diary-paper-margin" />
+      <div
+        style={{
+          minHeight: 'calc(100vh - 120px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+          background: 'var(--bg)',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: HAND_FONT,
+            fontSize: 52,
+            color: 'var(--accent)',
+            marginBottom: 4,
+            transform: 'rotate(-3deg)',
+          }}
+        >
+          Dear, me.
+        </div>
 
-          <div className="diary-lock-inner">
-            <div className="diary-lock-flower">✿</div>
+        <div
+          style={{
+            fontFamily: HAND_FONT,
+            fontSize: 21,
+            color: 'var(--text)',
+            marginBottom: 8,
+          }}
+        >
+          오늘의 일기
+        </div>
 
-            <div className="diary-lock-title">
-              나의 작은 일기장
-            </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--sub)',
+            marginBottom: 30,
+          }}
+        >
+          {savedPin
+            ? '조용히 문을 열어주세요.'
+            : '처음이라면 아무 4자리 PIN을 입력해주세요.'}
+        </div>
 
-            <div className="diary-lock-subtitle">
-              {savedPin
-                ? '오늘의 기록을 열어주세요'
-                : '처음이라면 아무 PIN이나 입력해 주세요'}
-            </div>
+        <div
+          style={{
+            display: 'flex',
+            gap: 15,
+            marginBottom: 34,
+          }}
+        >
+          {[0, 1, 2, 3].map(i => (
+            <div
+              key={i}
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                background:
+                  pin.length > i
+                    ? pinError
+                      ? 'var(--red)'
+                      : 'var(--accent)'
+                    : 'var(--border)',
+                transition: 'all .2s',
+              }}
+            />
+          ))}
+        </div>
 
-            <div className="diary-lock-line" />
-
-            <div className="diary-pin-dots">
-              {[0, 1, 2, 3].map(i => (
-                <div
-                  key={i}
-                  className={`diary-pin-dot ${
-                    pin.length > i ? 'filled' : ''
-                  } ${pinError ? 'error' : ''}`}
-                />
-              ))}
-            </div>
-
-            <div className="diary-keypad">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, '⌫'].map((d, i) => (
-                <button
-                  key={i}
-                  className={`diary-key ${
-                    d === '' ? 'empty' : ''
-                  }`}
-                  onClick={() => {
-                    if (d === '⌫') {
-                      setPin(p => p.slice(0, -1));
-                    } else if (d !== '') {
-                      tapPin(String(d));
-                    }
-                  }}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-
-            <div className="diary-lock-note">
-              오늘도 천천히 기록해요.
-            </div>
-          </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 72px)',
+            gap: 12,
+          }}
+        >
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, '⌫'].map(
+            (digit, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  if (digit === '⌫') {
+                    setPin(p => p.slice(0, -1));
+                  } else if (digit !== '') {
+                    tapPin(String(digit));
+                  }
+                }}
+                style={{
+                  height: 68,
+                  borderRadius: 18,
+                  border:
+                    digit === ''
+                      ? 'none'
+                      : '1px solid var(--border)',
+                  background:
+                    digit === ''
+                      ? 'transparent'
+                      : 'rgba(255,255,255,.72)',
+                  color:
+                    digit === '⌫'
+                      ? 'var(--sub)'
+                      : 'var(--text)',
+                  fontSize:
+                    digit === '⌫'
+                      ? 20
+                      : 23,
+                  fontWeight: 600,
+                  boxShadow:
+                    digit === ''
+                      ? 'none'
+                      : '0 3px 12px rgba(70,50,90,.06)',
+                }}
+              >
+                {digit}
+              </button>
+            )
+          )}
         </div>
       </div>
     );
   }
 
-  /* ─────────────────────────────────────────────
-     기본 상태 변경
-  ───────────────────────────────────────────── */
-  const updateDraft = (field, value) => {
+  /* ─────────────────────────────────────────
+     Draft
+  ───────────────────────────────────────── */
+
+  const updateDraft = changes => {
     setDraft(prev => ({
       ...prev,
-      [field]: value,
+      ...changes,
     }));
   };
 
-  const updateTextBlock = (blockId, text) => {
+  const updateTextBlock = (id, content) => {
     setDraft(prev => ({
       ...prev,
       blocks: prev.blocks.map(block =>
-        block.id === blockId
-          ? { ...block, text }
+        block.id === id
+          ? {
+              ...block,
+              content,
+            }
           : block
       ),
     }));
   };
 
-  const updatePhotoComment = (blockId, comment) => {
+  const updateImageComment = (id, comment) => {
     setDraft(prev => ({
       ...prev,
       blocks: prev.blocks.map(block =>
-        block.id === blockId
-          ? { ...block, comment }
+        block.id === id
+          ? {
+              ...block,
+              comment,
+            }
           : block
       ),
     }));
   };
 
-  /* ─────────────────────────────────────────────
-     textarea 자동 높이
-  ───────────────────────────────────────────── */
-  const resizeTextarea = (element) => {
-    if (!element) return;
+  /* ─────────────────────────────────────────
+     글 블록 추가
+  ───────────────────────────────────────── */
 
-    element.style.height = 'auto';
-    element.style.height = `${Math.max(
-      90,
-      element.scrollHeight
-    )}px`;
+  const addTextAfter = index => {
+    const newBlock = {
+      id: uid(),
+      type: 'text',
+      content: '',
+    };
+
+    setDraft(prev => {
+      const blocks = [...prev.blocks];
+
+      blocks.splice(index + 1, 0, newBlock);
+
+      return {
+        ...prev,
+        blocks,
+      };
+    });
+
+    setTimeout(() => {
+      const el = document.querySelector(
+        `[data-block-id="${newBlock.id}"]`
+      );
+
+      if (el) {
+        el.focus();
+        resizeTextarea(el);
+      }
+    }, 50);
   };
 
-  /* ─────────────────────────────────────────────
-     사진 압축
-  ───────────────────────────────────────────── */
-  const compressImage = (file) =>
-    new Promise((resolve) => {
+  /* ─────────────────────────────────────────
+     사진 위치 선택
+  ───────────────────────────────────────── */
+
+  const requestPhotoAt = index => {
+    pendingPhotoIndex.current = index;
+    fileRef.current?.click();
+  };
+
+  /* ─────────────────────────────────────────
+     이미지 압축
+  ───────────────────────────────────────── */
+
+  const compressImage = file =>
+    new Promise(resolve => {
       const img = new Image();
       const reader = new FileReader();
 
@@ -279,7 +434,7 @@ export default function DiaryTab({
       };
 
       img.onload = () => {
-        const MAX = 1600;
+        const MAX = 1800;
 
         let width = img.width;
         let height = img.height;
@@ -319,172 +474,161 @@ export default function DiaryTab({
       reader.readAsDataURL(file);
     });
 
-  /* ─────────────────────────────────────────────
-     Cloudinary 업로드
-  ───────────────────────────────────────────── */
-  const uploadToCloudinary = async (file) => {
-    const cloudName =
-      process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
+  /* ─────────────────────────────────────────
+     Cloudinary
+  ───────────────────────────────────────── */
 
-    const uploadPreset =
-      process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET;
-
-    if (!cloudName || !uploadPreset) {
-      throw new Error(
-        'Cloudinary 설정이 없습니다.'
-      );
-    }
-
+  const uploadToCloudinary = async file => {
     const formData = new FormData();
 
     formData.append('file', file);
+
     formData.append(
       'upload_preset',
-      uploadPreset
+      process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET
     );
 
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
       {
         method: 'POST',
         body: formData,
       }
     );
 
-    if (!response.ok) {
+    const result = await res.json();
+
+    if (!res.ok || !result.secure_url) {
       throw new Error(
         '사진 업로드에 실패했습니다.'
-      );
-    }
-
-    const result = await response.json();
-
-    if (!result.secure_url) {
-      throw new Error(
-        '사진 주소를 가져오지 못했습니다.'
       );
     }
 
     return result.secure_url;
   };
 
-  /* ─────────────────────────────────────────────
+  /* ─────────────────────────────────────────
      사진 추가
-     → 사진 바로 아래에 새 글 블록 자동 생성
-  ───────────────────────────────────────────── */
-  const openPhotoPicker = (afterIndex) => {
-    setInsertAfterIndex(afterIndex);
+  ───────────────────────────────────────── */
 
-    setTimeout(() => {
-      fileRef.current?.click();
-    }, 0);
-  };
+  const addPhotos = async files => {
+    const selected = Array.from(files || []);
 
-  const pickPhotos = (files) => {
-    if (!files || files.length === 0) return;
+    if (!selected.length) return;
 
-    const selected = Array.from(files);
+    setUploading(true);
 
-    setDraft(prev => {
-      let blocks = [...prev.blocks];
+    try {
+      const uploaded = [];
 
-      let insertIndex =
-        insertAfterIndex === null
-          ? blocks.length - 1
-          : insertAfterIndex;
+      for (const file of selected) {
+        const compressed = await compressImage(file);
+        const src = await uploadToCloudinary(compressed);
 
-      selected.forEach(file => {
-        const photoBlock = {
+        uploaded.push({
           id: uid(),
-          type: 'photo',
-          file,
-          preview: URL.createObjectURL(file),
+          type: 'image',
+          src,
           comment: '',
-        };
+        });
+      }
 
-        const textBlock = {
-          id: uid(),
-          type: 'text',
-          text: '',
-        };
+      setDraft(prev => {
+        const blocks = [...prev.blocks];
+
+        let insertIndex =
+          pendingPhotoIndex.current;
+
+        if (
+          insertIndex === null ||
+          insertIndex === undefined
+        ) {
+          insertIndex = blocks.length - 1;
+        }
 
         blocks.splice(
           insertIndex + 1,
           0,
-          photoBlock,
-          textBlock
+          ...uploaded
         );
 
-        insertIndex += 2;
+        const lastImageIndex =
+          insertIndex + uploaded.length;
+
+        const nextBlock = {
+          id: uid(),
+          type: 'text',
+          content: '',
+        };
+
+        blocks.splice(
+          lastImageIndex + 1,
+          0,
+          nextBlock
+        );
+
+        return {
+          ...prev,
+          blocks,
+        };
       });
 
-      return {
-        ...prev,
-        blocks,
-      };
-    });
+      pendingPhotoIndex.current = null;
 
-    setInsertAfterIndex(null);
-  };
+      setTimeout(() => {
+        const textBlocks =
+          document.querySelectorAll(
+            '[data-block-id]'
+          );
 
-  /* ─────────────────────────────────────────────
-     글 블록 추가
-  ───────────────────────────────────────────── */
-  const addTextAfter = (index) => {
-    const newBlock = {
-      id: uid(),
-      type: 'text',
-      text: '',
-    };
+        const last =
+          textBlocks[textBlocks.length - 1];
 
-    setDraft(prev => {
-      const blocks = [...prev.blocks];
-
-      blocks.splice(
-        index + 1,
-        0,
-        newBlock
+        if (last) {
+          last.focus();
+        }
+      }, 80);
+    } catch (error) {
+      console.error(
+        '사진 업로드 실패:',
+        error
       );
 
-      return {
-        ...prev,
-        blocks,
-      };
-    });
-
-    setTimeout(() => {
-      textRefs.current[newBlock.id]?.focus();
-    }, 50);
+      alert(
+        '사진을 추가하지 못했어요.\n다시 시도해주세요.'
+      );
+    } finally {
+      setUploading(false);
+    }
   };
 
-  /* ─────────────────────────────────────────────
-     블록 삭제
-  ───────────────────────────────────────────── */
-  const removeBlock = (blockId) => {
+  /* ─────────────────────────────────────────
+     사진 삭제
+  ───────────────────────────────────────── */
+
+  const removeImageBlock = id => {
+    if (
+      !window.confirm(
+        '이 사진을 삭제할까요?\n저장하면 영구적으로 삭제됩니다.'
+      )
+    ) {
+      return;
+    }
+
     setDraft(prev => {
-      let blocks = prev.blocks.filter(
-        block => block.id !== blockId
+      const blocks = prev.blocks.filter(
+        block => block.id !== id
       );
 
-      if (blocks.length === 0) {
-        blocks = [
-          {
-            id: uid(),
-            type: 'text',
-            text: '',
-          },
-        ];
-      }
+      const hasText = blocks.some(
+        block => block.type === 'text'
+      );
 
-      // 마지막 블록이 사진이면 글 블록 하나 추가
-      if (
-        blocks[blocks.length - 1].type ===
-        'photo'
-      ) {
+      if (!hasText) {
         blocks.push({
           id: uid(),
           type: 'text',
-          text: '',
+          content: '',
         });
       }
 
@@ -495,128 +639,117 @@ export default function DiaryTab({
     });
   };
 
-  /* ─────────────────────────────────────────────
-     사진 미리보기 주소
-  ───────────────────────────────────────────── */
-  const getPhotoSrc = (block) => {
-    return block.src || block.preview || '';
-  };
-
-  /* ─────────────────────────────────────────────
+  /* ─────────────────────────────────────────
      저장
-  ───────────────────────────────────────────── */
+  ───────────────────────────────────────── */
+
+  const hasContent =
+    Boolean(draft.title?.trim()) ||
+    Boolean(draft.emotion) ||
+    draft.blocks.some(block => {
+      if (block.type === 'image') {
+        return Boolean(block.src);
+      }
+
+      return Boolean(block.content?.trim());
+    });
+
   const handleSave = async () => {
+    if (!hasContent) {
+      alert('오늘의 기록을 조금만 남겨주세요.');
+      return;
+    }
+
     setUploading(true);
 
     try {
-      const finalBlocks = [];
+      const blocks = draft.blocks
+        .filter(block => {
+          if (block.type === 'image') {
+            return Boolean(block.src);
+          }
 
-      for (const block of draft.blocks) {
-        if (block.type === 'text') {
-          finalBlocks.push({
+          return true;
+        })
+        .map(block => {
+          if (block.type === 'image') {
+            return {
+              id: block.id,
+              type: 'image',
+              src: block.src,
+              comment: block.comment || '',
+            };
+          }
+
+          return {
             id: block.id,
             type: 'text',
-            text: block.text || '',
-          });
-
-          continue;
-        }
-
-        if (block.type === 'photo') {
-          let src = block.src || '';
-
-          // 새 사진만 Cloudinary 업로드
-          if (!src && block.file) {
-            const compressed =
-              await compressImage(block.file);
-
-            src = await uploadToCloudinary(
-              compressed
-            );
-          }
-
-          if (src) {
-            finalBlocks.push({
-              id: block.id,
-              type: 'photo',
-              src,
-              comment: block.comment || '',
-            });
-          }
-        }
-      }
-
-      const legacyText = finalBlocks
-        .filter(block => block.type === 'text')
-        .map(block => block.text || '')
-        .filter(Boolean)
-        .join('\n\n');
-
-      const legacyPhotos = finalBlocks
-        .filter(block => block.type === 'photo')
-        .map(block => ({
-          id: block.id,
-          src: block.src,
-          comment: block.comment || '',
-        }));
+            content: block.content || '',
+          };
+        });
 
       const entry = {
         date: key,
         title: draft.title || '',
         emotion: draft.emotion || '',
-
-        // 새 구조
-        blocks: finalBlocks,
-
-        // 기존 구조와의 호환성을 위해 같이 저장
-        text: legacyText,
-        photos: legacyPhotos,
-
-        // AI 오늘의 마무리는 나중에 이 자리에 저장
-        // aiReview: ...
-        // aiReviewSourceHash: ...
+        blocks,
       };
 
-      if (saveDiaryEntry) {
-        await saveDiaryEntry(key, entry);
-      } else {
-        // 혹시 구버전 App을 사용하고 있다면 대비
-        setData(prev => ({
-          ...prev,
-          [key]: entry,
-        }));
-      }
+      await saveDiaryEntry(key, entry);
 
-      alert('오늘의 기록이 저장됐어요. 🐷');
+      alert('오늘의 페이지를 저장했어요. 🐷');
     } catch (error) {
       console.error(
-        'Diary save error:',
+        'Diary 저장 실패:',
         error
       );
 
       alert(
-        '저장에 실패했어요.\n사진 업로드나 인터넷 연결을 확인해주세요.'
+        '저장에 실패했어요.\n\n' +
+          '기존 일기는 변경되지 않았어요.\n' +
+          '다시 시도해주세요.'
       );
     } finally {
       setUploading(false);
     }
   };
 
-  const hasContent =
-    draft.title.trim() ||
-    draft.emotion ||
-    draft.blocks.some(block => {
-      if (block.type === 'text') {
-        return block.text?.trim();
-      }
+  /* ─────────────────────────────────────────
+     오늘 마무리
+  ───────────────────────────────────────── */
 
-      return block.src || block.file;
-    });
+  const handleAiReview = async () => {
+    if (!hasContent) {
+      alert(
+        '먼저 오늘의 기록을 남겨주세요.'
+      );
+      return;
+    }
 
-  /* ─────────────────────────────────────────────
-     날짜 변경
-  ───────────────────────────────────────────── */
-  const moveDate = (amount) => {
+    setAiLoading(true);
+
+    /*
+      현재는 실제 AI 연결 전.
+      다음 단계에서 이 부분을 실제 AI 호출로 교체한다.
+    */
+
+    setTimeout(() => {
+      setAiReview({
+        review:
+          '오늘의 마무리 기능은 준비되어 있어요.\n\n현재는 AI 연결 전 단계예요. 다음 단계에서 오늘의 일기와 가계부 기록을 함께 읽고, 객관적이지만 따뜻한 하루의 총평을 만들어줄게요.',
+        createdAt:
+          new Date().toISOString(),
+      });
+
+      setAiLoading(false);
+    }, 500);
+  };
+
+  /* ─────────────────────────────────────────
+     날짜 이동
+  ───────────────────────────────────────── */
+
+  const moveDate = amount => {
     setDate(prev => {
       const next = new Date(prev);
       next.setDate(
@@ -626,382 +759,818 @@ export default function DiaryTab({
     });
   };
 
+  /* ─────────────────────────────────────────
+     화면
+  ───────────────────────────────────────── */
+
   return (
-    <div className="diary-page-wrap">
-
-      {/* 저장 중 */}
+    <div
+      style={{
+        minHeight: '100vh',
+        padding: '16px 13px 110px',
+        background: 'var(--bg)',
+      }}
+    >
+      {/* 저장 / 업로드 중 */}
       {uploading && (
-        <div className="diary-saving-overlay">
-          <div className="diary-saving-card">
-            <div className="diary-saving-icon">
-              🐷
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 500,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background:
+              'rgba(35,28,42,.28)',
+            backdropFilter: 'blur(3px)',
+          }}
+        >
+          <div
+            style={{
+              width: 190,
+              padding: '24px 18px',
+              borderRadius: 20,
+              background: 'var(--card)',
+              textAlign: 'center',
+              boxShadow:
+                '0 15px 45px rgba(30,20,40,.16)',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: HAND_FONT,
+                fontSize: 30,
+                marginBottom: 5,
+              }}
+            >
+              잠깐만
             </div>
 
-            <div className="diary-saving-title">
-              오늘의 기록을 보관하는 중
-            </div>
-
-            <div className="diary-saving-text">
-              사진도 차곡차곡 넣고 있어요.
+            <div
+              style={{
+                fontSize: 12,
+                color: 'var(--sub)',
+                lineHeight: 1.7,
+              }}
+            >
+              사진과 오늘의 기록을
+              <br />
+              일기장에 정리하고 있어요.
             </div>
           </div>
         </div>
       )}
 
-      {/* 종이 일기장 */}
-      <div className="diary-paper diary-main-paper">
-        <div className="diary-paper-margin" />
+      {/* 날짜 헤더 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          marginBottom: 10,
+        }}
+      >
+        <button
+          onClick={() => moveDate(-1)}
+          style={{
+            width: 40,
+            height: 40,
+            color: 'var(--accent)',
+            fontSize: 28,
+          }}
+        >
+          ‹
+        </button>
 
-        <div className="diary-paper-content">
-
-          {/* 날짜 */}
-          <div className="diary-date-navigation">
-            <button
-              className="diary-date-arrow"
-              onClick={() => moveDate(-1)}
-              aria-label="이전 날짜"
-            >
-              ‹
-            </button>
-
-            <button
-              className="diary-date-center"
-              onClick={() => setShowCal(true)}
-            >
-              <div className="diary-date-main">
-                {m}월 {day}일
-              </div>
-
-              <div className="diary-date-sub">
-                {y} · {dow}요일
-              </div>
-            </button>
-
-            <button
-              className="diary-date-arrow"
-              onClick={() => moveDate(1)}
-              aria-label="다음 날짜"
-            >
-              ›
-            </button>
+        <button
+          onClick={() => setShowCal(true)}
+          style={{
+            flex: 1,
+            background: 'transparent',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: HAND_FONT,
+              fontSize: 30,
+              fontWeight: 700,
+              lineHeight: 1,
+              color: 'var(--text)',
+            }}
+          >
+            {m}월 {day}일
           </div>
 
-          {/* PIN */}
-          <div className="diary-top-actions">
-            <button
-              className="diary-pin-button"
-              onClick={() =>
-                setShowSetPin(true)
-              }
-            >
-              🔒 PIN 변경
-            </button>
+          <div
+            style={{
+              marginTop: 5,
+              fontSize: 11,
+              color: 'var(--sub)',
+              letterSpacing: 1,
+            }}
+          >
+            {y} · {dow}요일
           </div>
+        </button>
 
+        <button
+          onClick={() => moveDate(1)}
+          style={{
+            width: 40,
+            height: 40,
+            color: 'var(--accent)',
+            fontSize: 28,
+          }}
+        >
+          ›
+        </button>
+      </div>
+
+      {/* 작은 상단 장식 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 12,
+          padding: '0 7px',
+        }}
+      >
+        <div
+          style={{
+            height: 1,
+            flex: 1,
+            background:
+              'rgba(120,95,135,.15)',
+          }}
+        />
+
+        <span
+          style={{
+            fontFamily: HAND_FONT,
+            fontSize: 14,
+            color: 'var(--sub)',
+          }}
+        >
+          today
+        </span>
+
+        <div
+          style={{
+            height: 1,
+            flex: 1,
+            background:
+              'rgba(120,95,135,.15)',
+          }}
+        />
+      </div>
+
+      {/* PIN */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          marginBottom: 8,
+        }}
+      >
+        <button
+          onClick={() =>
+            setShowSetPin(true)
+          }
+          style={{
+            fontSize: 11,
+            color: 'var(--sub)',
+          }}
+        >
+          🔒 PIN 변경
+        </button>
+      </div>
+
+      {/* ───────────────────────────────
+          종이
+      ─────────────────────────────── */}
+
+      <div
+        style={{
+          position: 'relative',
+          background:
+            'linear-gradient(90deg,#fdfbf7,#fffdf9 4%,#fffdf9 96%,#faf6ee)',
+          border:
+            '1px solid rgba(115,95,110,.13)',
+          borderRadius: 4,
+          padding: '25px 21px 32px',
+          boxShadow:
+            '0 8px 28px rgba(75,55,75,.09)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* 종이 질감 */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            opacity: .35,
+            backgroundImage:
+              'repeating-linear-gradient(to bottom, transparent 0, transparent 31px, rgba(115,105,125,.055) 32px)',
+          }}
+        />
+
+        {/* 왼쪽 세로선 */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 13,
+            width: 1,
+            background:
+              'rgba(190,100,115,.11)',
+          }}
+        />
+
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+          }}
+        >
           {/* 제목 */}
           <input
             value={draft.title}
             onChange={e =>
-              updateDraft(
-                'title',
-                e.target.value
-              )
+              updateDraft({
+                title: e.target.value,
+              })
             }
             placeholder="오늘의 제목"
-            className="diary-title-input"
+            style={{
+              width: '100%',
+              padding: '0 0 8px',
+              border: 'none',
+              borderBottom:
+                '1px solid rgba(120,100,120,.12)',
+              borderRadius: 0,
+              outline: 'none',
+              background: 'transparent',
+              color: 'var(--text)',
+              fontFamily: HAND_FONT,
+              fontSize: 28,
+              fontWeight: 700,
+            }}
           />
 
-          {/* 감정 */}
-          <div className="diary-emotion-section">
-            <div className="diary-section-label">
-              오늘의 기분
-            </div>
+          {/* 기분 */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              padding:
+                '10px 0 13px',
+              marginBottom: 13,
+              borderBottom:
+                '1px dashed rgba(120,100,120,.16)',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: HAND_FONT,
+                fontSize: 15,
+                color: 'var(--sub)',
+                marginRight: 5,
+              }}
+            >
+              오늘은
+            </span>
 
-            <div className="diary-emotions">
-              {EMOTIONS.map(emotion => {
-                const selected =
-                  draft.emotion ===
-                  emotion.label;
+            {EMOTIONS.map(emotion => {
+              const selected =
+                draft.emotion ===
+                emotion.label;
 
-                return (
-                  <button
-                    key={emotion.label}
-                    className={`diary-emotion ${
-                      selected
-                        ? 'selected'
-                        : ''
-                    }`}
-                    onClick={() =>
-                      updateDraft(
-                        'emotion',
-                        selected
-                          ? ''
-                          : emotion.label
-                      )
-                    }
-                  >
-                    <span className="diary-emotion-emoji">
-                      {emotion.emoji}
-                    </span>
-
-                    <span className="diary-emotion-label">
-                      {emotion.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+              return (
+                <button
+                  key={emotion.label}
+                  onClick={() =>
+                    updateDraft({
+                      emotion: selected
+                        ? ''
+                        : emotion.label,
+                    })
+                  }
+                  style={{
+                    width: 31,
+                    height: 31,
+                    borderRadius: '50%',
+                    border: selected
+                      ? '1px solid var(--accent)'
+                      : '1px solid transparent',
+                    background: selected
+                      ? 'rgba(155,109,221,.10)'
+                      : 'transparent',
+                    fontSize: 17,
+                    transform: selected
+                      ? 'scale(1.08)'
+                      : 'scale(1)',
+                    transition:
+                      'all .15s',
+                  }}
+                >
+                  {emotion.emoji}
+                </button>
+              );
+            })}
           </div>
 
-          <div className="diary-divider" />
-
-          {/* 본문 */}
-          <div className="diary-writing-area">
-
-            <div className="diary-writing-heading">
-              오늘의 기록
-            </div>
-
-            {draft.blocks.map(
-              (block, index) => {
-
-                /* ───── 글 블록 ───── */
-                if (block.type === 'text') {
-                  return (
-                    <div
-                      key={block.id}
-                      className="diary-text-block"
-                    >
-                      <textarea
-                        ref={el => {
-                          textRefs.current[
-                            block.id
-                          ] = el;
-
-                          if (el) {
-                            resizeTextarea(el);
-                          }
-                        }}
-                        value={
-                          block.text || ''
-                        }
-                        onChange={e => {
-                          updateTextBlock(
-                            block.id,
-                            e.target.value
-                          );
-
-                          resizeTextarea(
-                            e.target
-                          );
-                        }}
-                        placeholder={
-                          index === 0
-                            ? '오늘은 어떤 하루였나요?'
-                            : '그리고 또 어떤 일이 있었나요?'
-                        }
-                        className="diary-textarea"
-                        rows={1}
-                      />
-
-                      <div className="diary-block-tools">
-                        <button
-                          onClick={() =>
-                            openPhotoPicker(
-                              index
-                            )
-                          }
-                        >
-                          📷 사진
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            addTextAfter(
-                              index
-                            )
-                          }
-                        >
-                          ＋ 글
-                        </button>
-
-                        {draft.blocks.length >
-                          1 &&
-                          !(
-                            index === 0 &&
-                            !block.text
-                          ) && (
-                            <button
-                              className="delete-tool"
-                              onClick={() =>
-                                removeBlock(
-                                  block.id
-                                )
-                              }
-                            >
-                              삭제
-                            </button>
-                          )}
-                      </div>
-                    </div>
-                  );
-                }
-
-                /* ───── 사진 블록 ───── */
+          {/* 블록 */}
+          {draft.blocks.map(
+            (block, index) => {
+              if (block.type === 'text') {
                 return (
                   <div
                     key={block.id}
-                    className="diary-photo-block"
+                    style={{
+                      position: 'relative',
+                      marginBottom: 2,
+                    }}
                   >
-                    <div className="diary-photo-paper">
+                    <textarea
+                      data-block-id={
+                        block.id
+                      }
+                      value={
+                        block.content || ''
+                      }
+                      rows={1}
+                      onChange={e => {
+                        updateTextBlock(
+                          block.id,
+                          e.target.value
+                        );
+                        resizeTextarea(
+                          e.target
+                        );
+                      }}
+                      onFocus={e =>
+                        resizeTextarea(
+                          e.target
+                        )
+                      }
+                      placeholder={
+                        index === 0
+                          ? '오늘 있었던 일을 천천히 적어보세요.'
+                          : '그리고 또 어떤 일이 있었나요?'
+                      }
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        minHeight: 42,
+                        padding:
+                          '3px 2px 5px',
+                        border: 'none',
+                        borderRadius: 0,
+                        outline: 'none',
+                        resize: 'none',
+                        overflow: 'hidden',
+                        background:
+                          'transparent',
+                        color:
+                          'rgba(48,39,53,.92)',
+                        fontFamily: HAND_FONT,
+                        fontSize: 19,
+                        lineHeight: 1.75,
+                        letterSpacing: .2,
+                      }}
+                    />
+
+                    {/* 블록 도구 */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent:
+                          'center',
+                        gap: 7,
+                        padding:
+                          '3px 0 9px',
+                        opacity: .55,
+                      }}
+                    >
                       <button
-                        className="diary-photo-delete"
                         onClick={() =>
-                          removeBlock(
-                            block.id
-                          )
+                          addTextAfter(index)
                         }
-                        aria-label="사진 삭제"
+                        style={{
+                          padding:
+                            '3px 10px',
+                          borderRadius: 20,
+                          border:
+                            '1px solid rgba(120,100,130,.15)',
+                          background:
+                            'rgba(255,255,255,.45)',
+                          color:
+                            'var(--sub)',
+                          fontFamily:
+                            HAND_FONT,
+                          fontSize: 14,
+                        }}
                       >
-                        ×
+                        ＋ 글
                       </button>
 
-                      <img
-                        src={getPhotoSrc(block)}
-                        alt=""
-                        className="diary-photo-image"
-                        onClick={() =>
-                          setViewPhoto(block)
-                        }
-                      />
-
-                      <textarea
-                        value={
-                          block.comment || ''
-                        }
-                        onChange={e =>
-                          updatePhotoComment(
-                            block.id,
-                            e.target.value
-                          )
-                        }
-                        placeholder="사진 아래에 한마디..."
-                        className="diary-photo-comment"
-                        rows={1}
-                      />
-                    </div>
-
-                    <div className="diary-photo-tools">
                       <button
                         onClick={() =>
-                          addTextAfter(
+                          requestPhotoAt(
                             index
                           )
                         }
+                        style={{
+                          padding:
+                            '3px 10px',
+                          borderRadius: 20,
+                          border:
+                            '1px solid rgba(120,100,130,.15)',
+                          background:
+                            'rgba(255,255,255,.45)',
+                          color:
+                            'var(--sub)',
+                          fontFamily:
+                            HAND_FONT,
+                          fontSize: 14,
+                        }}
                       >
-                        ＋ 사진 아래에 글쓰기
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          openPhotoPicker(
-                            index
-                          )
-                        }
-                      >
-                        📷 사진 더하기
+                        📷 사진
                       </button>
                     </div>
                   </div>
                 );
               }
-            )}
 
-            {/* 맨 아래 추가 버튼 */}
-            <div className="diary-add-buttons">
-              <button
-                onClick={() =>
-                  addTextAfter(
-                    draft.blocks.length - 1
-                  )
+              if (block.type === 'image') {
+                if (!block.src) {
+                  return null;
                 }
-              >
-                ＋ 글 이어쓰기
-              </button>
 
-              <button
-                onClick={() =>
-                  openPhotoPicker(
-                    draft.blocks.length - 1
-                  )
-                }
-              >
-                📷 사진 남기기
-              </button>
-            </div>
-          </div>
+                return (
+                  <div
+                    key={block.id}
+                    style={{
+                      position:
+                        'relative',
+                      margin:
+                        '12px 4px 13px',
+                      padding:
+                        '9px 9px 11px',
+                      background:
+                        '#fffefa',
+                      boxShadow:
+                        '0 5px 18px rgba(55,45,55,.13)',
+                      transform:
+                        index % 2 === 0
+                          ? 'rotate(-0.45deg)'
+                          : 'rotate(0.45deg)',
+                    }}
+                  >
+                    {/* 테이프 느낌 */}
+                    <div
+                      style={{
+                        position:
+                          'absolute',
+                        top: -7,
+                        left: '50%',
+                        transform:
+                          'translateX(-50%) rotate(-1deg)',
+                        width: 58,
+                        height: 14,
+                        background:
+                          'rgba(215,198,170,.48)',
+                      }}
+                    />
 
-          {/* 오늘의 마무리 영역
-              AI 기능은 다음 단계에서 연결 */}
-          <div className="diary-closing-placeholder">
-            <div className="diary-closing-icon">
-              ✦
-            </div>
+                    <button
+                      onClick={() =>
+                        removeImageBlock(
+                          block.id
+                        )
+                      }
+                      style={{
+                        position:
+                          'absolute',
+                        top: 5,
+                        right: 5,
+                        width: 24,
+                        height: 24,
+                        borderRadius:
+                          '50%',
+                        background:
+                          'rgba(35,30,40,.48)',
+                        color: '#fff',
+                        fontSize: 15,
+                        zIndex: 2,
+                      }}
+                    >
+                      ×
+                    </button>
 
-            <div className="diary-closing-title">
-              오늘의 마무리
-            </div>
+                    <img
+                      src={block.src}
+                      alt=""
+                      onClick={() =>
+                        setViewPhoto(block)
+                      }
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        height: 'auto',
+                        objectFit: 'contain',
+                        cursor: 'pointer',
+                      }}
+                    />
 
-            <div className="diary-closing-text">
-              하루의 기록을 모두 남긴 뒤
-              <br />
-              오늘을 천천히 돌아보는 공간이에요.
-            </div>
+                    <textarea
+                      value={
+                        block.comment || ''
+                      }
+                      rows={1}
+                      onChange={e => {
+                        updateImageComment(
+                          block.id,
+                          e.target.value
+                        );
+                        resizeTextarea(
+                          e.target
+                        );
+                      }}
+                      onFocus={e =>
+                        resizeTextarea(
+                          e.target
+                        )
+                      }
+                      placeholder="이 사진에는 어떤 기억이 있나요?"
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        minHeight: 30,
+                        marginTop: 7,
+                        padding: '1px 2px',
+                        border: 'none',
+                        borderRadius: 0,
+                        outline: 'none',
+                        resize: 'none',
+                        overflow: 'hidden',
+                        background:
+                          'transparent',
+                        textAlign: 'center',
+                        color:
+                          'rgba(85,73,85,.85)',
+                        fontFamily:
+                          HAND_FONT,
+                        fontSize: 16,
+                        lineHeight: 1.5,
+                      }}
+                    />
 
-            <div className="diary-closing-coming">
-              AI와 함께 정리하기 · 다음 단계에서 추가
-            </div>
-          </div>
+                    {/* 사진 뒤에 글 */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent:
+                          'center',
+                        gap: 7,
+                        marginTop: 3,
+                      }}
+                    >
+                      <button
+                        onClick={() =>
+                          addTextAfter(index)
+                        }
+                        style={{
+                          padding:
+                            '2px 10px',
+                          borderRadius: 18,
+                          border:
+                            '1px solid rgba(120,100,130,.13)',
+                          background:
+                            'rgba(245,240,235,.65)',
+                          color:
+                            'var(--sub)',
+                          fontFamily:
+                            HAND_FONT,
+                          fontSize: 13,
+                        }}
+                      >
+                        ＋ 이어쓰기
+                      </button>
 
-          {/* 저장 */}
-          <div className="diary-save-area">
-            <SaveBtn
-              onClick={handleSave}
-              disabled={
-                !hasContent || uploading
+                      <button
+                        onClick={() =>
+                          requestPhotoAt(
+                            index
+                          )
+                        }
+                        style={{
+                          padding:
+                            '2px 10px',
+                          borderRadius: 18,
+                          border:
+                            '1px solid rgba(120,100,130,.13)',
+                          background:
+                            'rgba(245,240,235,.65)',
+                          color:
+                            'var(--sub)',
+                          fontFamily:
+                            HAND_FONT,
+                          fontSize: 13,
+                        }}
+                      >
+                        📷 또 한 장
+                      </button>
+                    </div>
+                  </div>
+                );
               }
-              label={
-                uploading
-                  ? '저장하는 중...'
-                  : '오늘의 기록 저장하기'
-              }
-            />
 
-            <div className="diary-save-hint">
-              저장한 기록은 이 날짜에 남아요.
-            </div>
+              return null;
+            }
+          )}
+
+          {/* 처음부터 사진 */}
+          <button
+            onClick={() =>
+              requestPhotoAt(
+                draft.blocks.length - 1
+              )
+            }
+            style={{
+              width: '100%',
+              marginTop: 5,
+              padding: '10px',
+              border:
+                '1px dashed rgba(120,100,130,.20)',
+              borderRadius: 10,
+              background:
+                'rgba(255,255,255,.35)',
+              color: 'var(--sub)',
+              fontFamily: HAND_FONT,
+              fontSize: 15,
+            }}
+          >
+            📷 사진 한 장 남기기
+          </button>
+
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display: 'none' }}
+            onChange={e => {
+              addPhotos(e.target.files);
+              e.target.value = '';
+            }}
+          />
+
+          {/* 페이지 끝 */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              marginTop: 22,
+              color:
+                'rgba(120,100,130,.35)',
+              fontFamily: HAND_FONT,
+              fontSize: 14,
+            }}
+          >
+            — 끝 —
           </div>
-
         </div>
       </div>
 
-      {/* 파일 선택 */}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        multiple
-        style={{ display: 'none' }}
-        onChange={e => {
-          pickPhotos(e.target.files);
-          e.target.value = '';
-        }}
-      />
+      {/* 저장 */}
+      <div style={{ marginTop: 13 }}>
+        <SaveBtn
+          onClick={handleSave}
+          disabled={!hasContent || uploading}
+          label="오늘의 페이지 저장"
+        />
+      </div>
 
-      {/* 달력 */}
+      {/* ───────────────────────────────
+          오늘 마무리
+      ─────────────────────────────── */}
+
+      <div
+        style={{
+          position: 'relative',
+          marginTop: 28,
+          padding: '21px 19px',
+          borderRadius: 5,
+          background:
+            'rgba(250,247,241,.88)',
+          border:
+            '1px solid rgba(120,100,130,.13)',
+          boxShadow:
+            '0 5px 20px rgba(70,55,80,.05)',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: HAND_FONT,
+            fontSize: 24,
+            fontWeight: 700,
+            color: 'var(--text)',
+          }}
+        >
+          오늘의 마무리
+        </div>
+
+        <div
+          style={{
+            marginTop: 2,
+            marginBottom: 15,
+            fontFamily: HAND_FONT,
+            fontSize: 15,
+            color: 'var(--sub)',
+            lineHeight: 1.5,
+          }}
+        >
+          오늘 하루를 천천히 돌아보는 시간.
+        </div>
+
+        {aiReview ? (
+          <div
+            style={{
+              padding: '16px 15px',
+              borderRadius: 4,
+              background:
+                'rgba(255,255,255,.72)',
+              border:
+                '1px solid rgba(120,100,130,.12)',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: HAND_FONT,
+                fontSize: 17,
+                color: 'var(--accent)',
+                marginBottom: 7,
+              }}
+            >
+              JARVIS
+            </div>
+
+            <div
+              style={{
+                whiteSpace: 'pre-wrap',
+                fontFamily: HAND_FONT,
+                fontSize: 17,
+                lineHeight: 1.7,
+                color: 'var(--text)',
+              }}
+            >
+              {aiReview.review}
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={handleAiReview}
+            disabled={
+              aiLoading || !hasContent
+            }
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: 10,
+              border:
+                '1px solid rgba(120,100,130,.15)',
+              background:
+                'rgba(255,255,255,.65)',
+              color:
+                aiLoading || !hasContent
+                  ? 'var(--sub)'
+                  : 'var(--accent)',
+              fontFamily: HAND_FONT,
+              fontSize: 17,
+              fontWeight: 700,
+            }}
+          >
+            {aiLoading
+              ? '오늘을 정리하는 중...'
+              : '✦ 오늘 마무리하기'}
+          </button>
+        )}
+      </div>
+
+      {/* 캘린더 */}
       {showCal && (
         <CalendarOverlay
-          current={{ y, m, day }}
+          current={{
+            y,
+            m,
+            day,
+          }}
           onSelect={setDate}
           onClose={() =>
             setShowCal(false)
@@ -1013,24 +1582,31 @@ export default function DiaryTab({
       {/* 사진 확대 */}
       {viewPhoto && (
         <div
-          className="diary-photo-viewer"
           onClick={() =>
             setViewPhoto(null)
           }
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 400,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 15,
+            background:
+              'rgba(25,20,30,.93)',
+          }}
         >
-          <button
-            className="diary-photo-viewer-close"
-            onClick={() =>
-              setViewPhoto(null)
-            }
-          >
-            ×
-          </button>
-
           <img
-            src={getPhotoSrc(viewPhoto)}
+            src={viewPhoto.src}
             alt=""
-            className="diary-photo-viewer-image"
+            style={{
+              maxWidth: '100%',
+              maxHeight: '92vh',
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'contain',
+            }}
           />
         </div>
       )}
@@ -1045,85 +1621,128 @@ export default function DiaryTab({
             setNewPinConfirm('');
           }}
         >
-          <div className="diary-pin-form">
-
-            <label>
-              새 PIN · 4자리
+          <div style={{ marginBottom: 12 }}>
+            <label
+              style={{
+                fontSize: 11,
+                color: 'var(--sub)',
+                fontWeight: 600,
+                display: 'block',
+                marginBottom: 5,
+              }}
+            >
+              새 PIN (4자리)
             </label>
 
             <input
               type="password"
-              inputMode="numeric"
               maxLength={4}
+              inputMode="numeric"
               value={newPin}
               onChange={e =>
                 setNewPin(
                   e.target.value.replace(
-                    /\D/g,
+                    /[^0-9]/g,
                     ''
                   )
                 )
               }
               placeholder="••••"
+              style={{
+                width: '100%',
+                border:
+                  '1.5px solid var(--border)',
+                borderRadius: 10,
+                padding: '10px 12px',
+                fontSize: 14,
+                background: 'var(--card)',
+                letterSpacing: 8,
+                boxSizing: 'border-box',
+              }}
             />
+          </div>
 
-            <label>
+          <div style={{ marginBottom: 12 }}>
+            <label
+              style={{
+                fontSize: 11,
+                color: 'var(--sub)',
+                fontWeight: 600,
+                display: 'block',
+                marginBottom: 5,
+              }}
+            >
               PIN 확인
             </label>
 
             <input
               type="password"
-              inputMode="numeric"
               maxLength={4}
+              inputMode="numeric"
               value={newPinConfirm}
               onChange={e =>
                 setNewPinConfirm(
                   e.target.value.replace(
-                    /\D/g,
+                    /[^0-9]/g,
                     ''
                   )
                 )
               }
               placeholder="••••"
-            />
-
-            {newPin &&
-              newPinConfirm &&
-              newPin !==
-                newPinConfirm && (
-                <div className="diary-pin-error">
-                  PIN이 일치하지 않아요.
-                </div>
-              )}
-
-            <SaveBtn
-              onClick={() => {
-                if (
-                  newPin.length === 4 &&
-                  newPin ===
-                    newPinConfirm
-                ) {
-                  Store.set(
-                    'jarvis-pin',
-                    newPin
-                  );
-
-                  setShowSetPin(false);
-                  setNewPin('');
-                  setNewPinConfirm('');
-
-                  alert(
-                    'PIN이 변경됐어요! 🐷'
-                  );
-                }
+              style={{
+                width: '100%',
+                border:
+                  '1.5px solid var(--border)',
+                borderRadius: 10,
+                padding: '10px 12px',
+                fontSize: 14,
+                background: 'var(--card)',
+                letterSpacing: 8,
+                boxSizing: 'border-box',
               }}
-              disabled={
-                newPin.length !== 4 ||
-                newPin !== newPinConfirm
-              }
-              label="PIN 저장"
             />
           </div>
+
+          {newPin &&
+            newPinConfirm &&
+            newPin !== newPinConfirm && (
+              <div
+                style={{
+                  color: 'var(--red)',
+                  fontSize: 12,
+                  marginBottom: 8,
+                }}
+              >
+                PIN이 일치하지 않아요.
+              </div>
+            )}
+
+          <SaveBtn
+            onClick={() => {
+              if (
+                newPin.length === 4 &&
+                newPin === newPinConfirm
+              ) {
+                Store.set(
+                  'jarvis-pin',
+                  newPin
+                );
+
+                setShowSetPin(false);
+                setNewPin('');
+                setNewPinConfirm('');
+
+                alert(
+                  'PIN이 변경됐어요!'
+                );
+              }
+            }}
+            disabled={
+              newPin.length !== 4 ||
+              newPin !== newPinConfirm
+            }
+            label="PIN 저장"
+          />
         </Modal>
       )}
     </div>
