@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 
 import TodoTab from './tabs/TodoTab';
+import HomeTab from './tabs/HomeTab';
 import LedgerTab from './tabs/LedgerTab';
 import DiaryTab from './tabs/DiaryTab';
 import CycleTab from './tabs/CycleTab';
@@ -30,10 +31,11 @@ const TABS = [
 ];
 
 export default function App() {
-  const [tab, setTab] = useState('todo');
+  const [tab, setTab] = useState('home');
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [diaryUnlocked, setDiaryUnlocked] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const [todoData, setTodoData] = useState({
     routines: [],
