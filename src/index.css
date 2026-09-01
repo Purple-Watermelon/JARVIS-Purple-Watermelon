@@ -1,27 +1,57 @@
 @import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@300;400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap');
 
 :root {
-  --bg: #f5f0ff;
-  --card: #ffffff;
-  --text: #2d1b69;
-  --sub: #9b89c4;
-  --border: #e8dff8;
-  --accent: #9b6ddd;
-  --accent2: #c4a7f0;
-  --accent-bg: rgba(155, 109, 221, 0.1);
-  --lilac: #b39ddb;
-  --lilac-light: #ede7f6;
-  --pig: #ffb3c6;
-  --pig-light: #fff0f5;
-  --red: #e05252;
-  --red-bg: rgba(224, 82, 82, 0.1);
-  --green: #3dbf6c;
-  --green-bg: rgba(61, 191, 108, 0.1);
-  --yellow: #e8a838;
-  --yellow-bg: rgba(232, 168, 56, 0.1);
+  /* ── JARVIS Purple Diary ─────────────────────────────── */
+
+  /* 전체 배경 : 따뜻한 종이 */
+  --bg: #f3f0f4;
+
+  /* 카드 : 살짝 따뜻한 백색 종이 */
+  --card: #fffdfb;
+
+  /* 본문 : 검정보다 부드러운 잉크색 */
+  --text: #403847;
+
+  /* 보조 글씨 */
+  --sub: #918997;
+
+  /* 아주 연한 종이 테두리 */
+  --border: #e5dfe6;
+
+  /* 메인 : 채도 낮춘 더스티 퍼플 */
+  --accent: #89739a;
+
+  /* 보조 퍼플 */
+  --accent2: #b5a4bd;
+
+  /* 선택 영역 */
+  --accent-bg: #eee8f1;
+
+  /* 라벤더 */
+  --lilac: #aa98b3;
+  --lilac-light: #f1edf3;
+
+  /* 돼지 포인트 */
+  --pig: #d99aaa;
+  --pig-light: #faf0f3;
+
+  /* 상태 색상 */
+  --red: #c96f76;
+  --red-bg: #f8eeee;
+
+  --green: #729b82;
+  --green-bg: #edf4ef;
+
+  --yellow: #c09a5c;
+  --yellow-bg: #f7f1e7;
+
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* 손글씨 */
   --font-hand: 'Gaegu', cursive;
 }
+
+/* ── 기본 초기화 ───────────────────────────────────────── */
 
 * {
   box-sizing: border-box;
@@ -30,14 +60,19 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  background: var(--bg);
+}
+
 body {
   font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
   background: var(--bg);
-  background: #e8e0f5;
   color: var(--text);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── 버튼 ─────────────────────────────────────────────── */
 
 button {
   cursor: pointer;
@@ -48,7 +83,11 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-input, select, textarea {
+/* ── 입력창 ───────────────────────────────────────────── */
+
+input,
+select,
+textarea {
   font-family: inherit;
   color: var(--text);
   background: var(--card);
@@ -62,7 +101,15 @@ input, select, textarea {
   font-size: 14px;
 }
 
-input:focus, select:focus, textarea:focus {
+input::placeholder,
+select::placeholder,
+textarea::placeholder {
+  color: #aaa2ad;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
   border-color: var(--accent);
 }
 
@@ -71,14 +118,26 @@ textarea {
   line-height: 1.6;
 }
 
+/* ── Select ────────────────────────────────────────────── */
+
 select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a6f8a'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2389798f'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 32px;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+/* ── Scrollbar ────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
