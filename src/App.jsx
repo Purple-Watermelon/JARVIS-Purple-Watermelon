@@ -740,8 +740,7 @@ export default function App() {
   </button>
 
 </nav>  
-         
-      </nav>
+
     {menuOpen && (
   <>
     {/* 배경 */}
