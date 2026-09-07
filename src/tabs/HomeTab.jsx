@@ -18,10 +18,9 @@ export default function HomeTab({
     weekday: 'long'
   });
 
-  // ─────────────────────────────────────────
-  // 오늘의 지출
-  // LedgerTab과 동일하게 datetime / isSaving / amount 사용
-  // ─────────────────────────────────────────
+  /* ─────────────────────────────────────
+     오늘의 지출
+  ───────────────────────────────────── */
 
   const todayExpense = useMemo(() => {
     if (!Array.isArray(ledgerData)) return 0;
@@ -29,7 +28,6 @@ export default function HomeTab({
     return ledgerData
       .filter(item => {
         if (!item || item.isSaving) return false;
-
         return toDay(item.datetime) === dateKey;
       })
       .reduce((sum, item) => {
@@ -37,60 +35,87 @@ export default function HomeTab({
       }, 0);
   }, [ledgerData, dateKey]);
 
-  // ─────────────────────────────────────────
-  // 오늘의 할 일
-  // daily + work
-  // ─────────────────────────────────────────
+
+  /* ─────────────────────────────────────
+     오늘의 할 일
+     
+     TodoTab과 같은 완료 데이터 사용
+     - daily → completed[dateKey][id]
+     - work → doneDate === dateKey
+  ───────────────────────────────────── */
 
   const todoCount = useMemo(() => {
     const data = todoData || {};
+    const completedMap = data.completed?.[dateKey] || {};
 
     let total = 0;
     let completed = 0;
 
-    const addItems = items => {
-      if (!Array.isArray(items)) return;
+    /* 오늘의 일상 */
+    let dailyItems = [];
 
-      items.forEach(item => {
-        if (!item) return;
-
-        total += 1;
-
-        if (
-          item.completed === true ||
-          item.done === true ||
-          item.checked === true
-        ) {
-          completed += 1;
-        }
-      });
-    };
-
-    // 오늘의 daily
     if (data.daily) {
       if (Array.isArray(data.daily)) {
-        addItems(data.daily);
+        dailyItems = data.daily;
       } else if (typeof data.daily === 'object') {
-        const todayItems =
+        dailyItems =
           data.daily[dateKey] ||
           data.daily[dateKey.replaceAll('-', '.')] ||
           data.daily[dateKey.replaceAll('-', '/')] ||
           [];
-
-        addItems(todayItems);
       }
     }
 
-    // 오늘의 work
-    if (data.work && typeof data.work === 'object') {
-      const todayWork =
-        data.work[dateKey] ||
-        data.work[dateKey.replaceAll('-', '.')] ||
-        data.work[dateKey.replaceAll('-', '/')] ||
-        [];
+    if (Array.isArray(dailyItems)) {
+      dailyItems.forEach(item => {
+        if (!item) return;
 
-      addItems(todayWork);
+        total += 1;
+
+        if (completedMap[item.id]) {
+          completed += 1;
+        }
+      });
     }
+
+
+    /* 오늘의 회사업무 */
+    let workItems = [];
+
+    if (data.work && typeof data.work === 'object') {
+      const allWork = Object.values(data.work).flat();
+
+      workItems = allWork.filter(item => {
+        if (!item) return false;
+
+        if (item.startDate > dateKey) {
+          return false;
+        }
+
+        if (item.removed?.[dateKey]) {
+          return false;
+        }
+
+        /*
+         * 완료한 날 이후에는 목록에서 제외.
+         * 단, 완료한 바로 그 날은 오늘의 완료 항목으로 포함.
+         */
+        if (item.doneDate && item.doneDate < dateKey) {
+          return false;
+        }
+
+        return true;
+      });
+    }
+
+    workItems.forEach(item => {
+      total += 1;
+
+      if (item.doneDate === dateKey) {
+        completed += 1;
+      }
+    });
+
 
     return {
       total,
@@ -99,38 +124,53 @@ export default function HomeTab({
     };
   }, [todoData, dateKey]);
 
-  // ─────────────────────────────────────────
-  // 오늘의 루틴
-  // 할 일과 별도의 카드로 표시
-  // ─────────────────────────────────────────
+
+  /* ─────────────────────────────────────
+     오늘의 루틴
+     
+     루틴은 오늘의 할 일과 별도로 표시
+  ───────────────────────────────────── */
 
   const routineCount = useMemo(() => {
-    const routines = Array.isArray(todoData?.routines)
-      ? todoData.routines
+    const data = todoData || {};
+    const routines = Array.isArray(data.routines)
+      ? data.routines
       : [];
 
-    let completed = 0;
+    const completedMap = data.completed?.[dateKey] || {};
 
-    routines.forEach(item => {
-      if (
-        item?.completed === true ||
-        item?.done === true ||
-        item?.checked === true
-      ) {
-        completed += 1;
+    const activeRoutines = routines.filter(item => {
+      if (!item) return false;
+
+      if (item.addedDate && item.addedDate > dateKey) {
+        return false;
       }
+
+      if (item.removed?.[dateKey]) {
+        return false;
+      }
+
+      return true;
     });
 
-    return {
-      total: routines.length,
-      completed,
-      remaining: Math.max(0, routines.length - completed)
-    };
-  }, [todoData]);
+    const completed = activeRoutines.filter(
+      item => completedMap[item.id]
+    ).length;
 
-  // ─────────────────────────────────────────
-  // 오늘의 일기
-  // ─────────────────────────────────────────
+    return {
+      total: activeRoutines.length,
+      completed,
+      remaining: Math.max(
+        0,
+        activeRoutines.length - completed
+      )
+    };
+  }, [todoData, dateKey]);
+
+
+  /* ─────────────────────────────────────
+     오늘의 일기
+  ───────────────────────────────────── */
 
   const diaryStatus = useMemo(() => {
     const entry = diaryData?.[dateKey];
@@ -148,13 +188,13 @@ export default function HomeTab({
 
     const hasText = blocks.some(
       block =>
-        block.type === 'text' &&
+        block?.type === 'text' &&
         String(block.content || '').trim()
     );
 
     const hasImage = blocks.some(
       block =>
-        block.type === 'image' &&
+        block?.type === 'image' &&
         block.src
     );
 
@@ -178,12 +218,14 @@ export default function HomeTab({
     };
   }, [diaryData, dateKey]);
 
+
   const money = value =>
     `${Number(value || 0).toLocaleString('ko-KR')}원`;
 
-  // ─────────────────────────────────────────
-  // 카드 공통 스타일
-  // ─────────────────────────────────────────
+
+  /* ─────────────────────────────────────
+     카드 스타일
+  ───────────────────────────────────── */
 
   const card = {
     background: 'var(--card)',
@@ -193,11 +235,13 @@ export default function HomeTab({
     boxShadow: '0 5px 20px rgba(70,55,90,0.045)'
   };
 
+
   const go = tab => {
     if (onNavigate) {
       onNavigate(tab);
     }
   };
+
 
   return (
     <div
@@ -208,9 +252,7 @@ export default function HomeTab({
       }}
     >
 
-      {/* ─────────────────────────────────────
-          인사
-      ───────────────────────────────────── */}
+      {/* 인사 */}
 
       <section
         style={{
@@ -243,9 +285,7 @@ export default function HomeTab({
       </section>
 
 
-      {/* ─────────────────────────────────────
-          오늘의 할 일
-      ───────────────────────────────────── */}
+      {/* 오늘의 할 일 */}
 
       <button
         onClick={() => go('todo')}
@@ -313,6 +353,7 @@ export default function HomeTab({
           </div>
         </div>
 
+
         <div
           style={{
             marginTop: 13,
@@ -335,7 +376,8 @@ export default function HomeTab({
                   : '0%',
               height: '100%',
               background: 'var(--accent)',
-              borderRadius: 10
+              borderRadius: 10,
+              transition: 'width 0.3s ease'
             }}
           />
         </div>
@@ -347,14 +389,12 @@ export default function HomeTab({
             color: 'var(--sub)'
           }}
         >
-          {todoCount.completed}건 완료
+          {todoCount.completed}건 완료 · {todoCount.total}건 중
         </div>
       </button>
 
 
-      {/* ─────────────────────────────────────
-          오늘의 루틴
-      ───────────────────────────────────── */}
+      {/* 오늘의 루틴 */}
 
       <button
         onClick={() => go('todo')}
@@ -422,6 +462,7 @@ export default function HomeTab({
           </div>
         </div>
 
+
         <div
           style={{
             marginTop: 13,
@@ -444,7 +485,8 @@ export default function HomeTab({
                   : '0%',
               height: '100%',
               background: 'var(--accent)',
-              borderRadius: 10
+              borderRadius: 10,
+              transition: 'width 0.3s ease'
             }}
           />
         </div>
@@ -456,14 +498,12 @@ export default function HomeTab({
             color: 'var(--sub)'
           }}
         >
-          {routineCount.completed}건 완료
+          {routineCount.completed}건 완료 · {routineCount.total}건 중
         </div>
       </button>
 
 
-      {/* ─────────────────────────────────────
-          오늘의 지출
-      ───────────────────────────────────── */}
+      {/* 오늘의 지출 */}
 
       <button
         onClick={() => go('ledger')}
@@ -534,9 +574,7 @@ export default function HomeTab({
       </button>
 
 
-      {/* ─────────────────────────────────────
-          오늘의 기록
-      ───────────────────────────────────── */}
+      {/* 오늘의 기록 */}
 
       <section
         style={{
@@ -622,9 +660,7 @@ export default function HomeTab({
       </section>
 
 
-      {/* ─────────────────────────────────────
-          오늘 마무리
-      ───────────────────────────────────── */}
+      {/* 오늘 마무리 */}
 
       <button
         onClick={() => go('diary')}
@@ -676,8 +712,6 @@ export default function HomeTab({
         </div>
       </button>
 
-
-      {/* 작은 바로가기 */}
 
       <div
         style={{
