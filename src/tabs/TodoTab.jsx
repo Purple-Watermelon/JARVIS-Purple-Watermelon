@@ -14,6 +14,12 @@ const PC = {
   낮음: '#52ae7a'
 };
 
+const PORDER = {
+  높음: 0,
+  중간: 1,
+  낮음: 2
+};
+
 const lbl = {
   fontSize: 11,
   color: 'var(--sub)',
@@ -35,8 +41,37 @@ const inp = {
   boxSizing: 'border-box'
 };
 
-const byOrder = (a, b) =>
-  (a.order ?? 9999) - (b.order ?? 9999);
+/* =========================================================
+   기본 정렬
+========================================================= */
+
+const byOrder = (a, b) => {
+  const orderDiff =
+    (a.order ?? 9999) -
+    (b.order ?? 9999);
+
+  if (orderDiff !== 0) {
+    return orderDiff;
+  }
+
+  const dateA =
+    a.addedDate ||
+    a.startDate ||
+    '';
+
+  const dateB =
+    b.addedDate ||
+    b.startDate ||
+    '';
+
+  if (dateA !== dateB) {
+    return dateA.localeCompare(dateB);
+  }
+
+  return String(a.id || '').localeCompare(
+    String(b.id || '')
+  );
+};
 
 /* =========================================================
    날짜 차이
@@ -52,15 +87,60 @@ const dayDiff = (from, to) => {
 };
 
 /* =========================================================
+   완료일 찾기
+     
+   새 구조:
+   completed = {
+     "2026-09-15": {
+       id: true
+     }
+   }
+
+   가장 최근 완료일을 찾는다.
+========================================================= */
+
+const getCompletionDate = (
+  completed,
+  id,
+  currentDate
+) => {
+  const dates = Object.keys(
+    completed || {}
+  )
+    .filter(date => {
+      if (date > currentDate) {
+        return false;
+      }
+
+      return !!completed?.[date]?.[id];
+    })
+    .sort();
+
+  return dates.length
+    ? dates[dates.length - 1]
+    : null;
+};
+
+/* =========================================================
    이월 표시
 ========================================================= */
 
-const getCarryBadge = (addedDate, currentDate) => {
-  if (!addedDate || !currentDate) return null;
+const getCarryBadge = (
+  addedDate,
+  currentDate
+) => {
+  if (!addedDate || !currentDate) {
+    return null;
+  }
 
-  const diff = dayDiff(addedDate, currentDate);
+  const diff = dayDiff(
+    addedDate,
+    currentDate
+  );
 
-  if (diff <= 0) return null;
+  if (diff <= 0) {
+    return null;
+  }
 
   return {
     label: `등록 + ${diff}일`,
@@ -72,10 +152,18 @@ const getCarryBadge = (addedDate, currentDate) => {
    완료 표시
 ========================================================= */
 
-const getCompletedBadge = (addedDate, completedDate) => {
-  if (!addedDate || !completedDate) return null;
+const getCompletedBadge = (
+  addedDate,
+  completedDate
+) => {
+  if (!addedDate || !completedDate) {
+    return null;
+  }
 
-  const diff = dayDiff(addedDate, completedDate);
+  const diff = dayDiff(
+    addedDate,
+    completedDate
+  );
 
   if (diff <= 0) {
     return {
@@ -107,7 +195,8 @@ function ActionBar({
       style={{
         display: 'flex',
         background: 'var(--bg)',
-        borderTop: '1px solid var(--border)'
+        borderTop:
+          '1px solid var(--border)'
       }}
     >
       <button
@@ -121,7 +210,8 @@ function ActionBar({
           fontSize: 12,
           color: 'var(--accent)',
           fontWeight: 700,
-          borderRight: '1px solid var(--border)',
+          borderRight:
+            '1px solid var(--border)',
           background: 'none',
           cursor: 'pointer'
         }}
@@ -139,11 +229,16 @@ function ActionBar({
           flex: 1,
           padding: '10px 0',
           fontSize: 13,
-          color: canUp ? 'var(--text)' : 'var(--border)',
+          color: canUp
+            ? 'var(--text)'
+            : 'var(--border)',
           fontWeight: 700,
-          borderRight: '1px solid var(--border)',
+          borderRight:
+            '1px solid var(--border)',
           background: 'none',
-          cursor: canUp ? 'pointer' : 'default'
+          cursor: canUp
+            ? 'pointer'
+            : 'default'
         }}
       >
         ↑
@@ -159,11 +254,16 @@ function ActionBar({
           flex: 1,
           padding: '10px 0',
           fontSize: 13,
-          color: canDown ? 'var(--text)' : 'var(--border)',
+          color: canDown
+            ? 'var(--text)'
+            : 'var(--border)',
           fontWeight: 700,
-          borderRight: '1px solid var(--border)',
+          borderRight:
+            '1px solid var(--border)',
           background: 'none',
-          cursor: canDown ? 'pointer' : 'default'
+          cursor: canDown
+            ? 'pointer'
+            : 'default'
         }}
       >
         ↓
@@ -204,17 +304,22 @@ function WishRow({
   canUp,
   canDown
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] =
+    useState(false);
+
   const bought = !!w.boughtDate;
 
   return (
     <div
       style={{
-        borderBottom: '1px solid var(--border)'
+        borderBottom:
+          '1px solid var(--border)'
       }}
     >
       <div
-        onClick={() => setOpen(o => !o)}
+        onClick={() =>
+          setOpen(o => !o)
+        }
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -223,7 +328,11 @@ function WishRow({
           gap: 12
         }}
       >
-        <div style={{ flex: 1 }}>
+        <div
+          style={{
+            flex: 1
+          }}
+        >
           <div
             style={{
               fontSize: 13.5,
@@ -251,10 +360,13 @@ function WishRow({
               <span
                 style={{
                   fontSize: 10,
-                  padding: '2px 7px',
+                  padding:
+                    '2px 7px',
                   borderRadius: 10,
-                  background: 'var(--bg)',
-                  color: 'var(--sub)'
+                  background:
+                    'var(--bg)',
+                  color:
+                    'var(--sub)'
                 }}
               >
                 {w.category}
@@ -265,10 +377,13 @@ function WishRow({
               <span
                 style={{
                   fontSize: 10,
-                  padding: '2px 7px',
+                  padding:
+                    '2px 7px',
                   borderRadius: 10,
-                  background: 'var(--accent-bg)',
-                  color: 'var(--accent)',
+                  background:
+                    'var(--accent-bg)',
+                  color:
+                    'var(--accent)',
                   fontWeight: 700
                 }}
               >
@@ -313,7 +428,8 @@ function WishRow({
               : 'transparent',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent:
+              'center'
           }}
         >
           {bought && (
@@ -359,12 +475,23 @@ export default function TodoTab({
 }) {
   const today = new Date();
 
-  const [date, setDate] = useState(today);
-  const [showCal, setShowCal] = useState(false);
-  const [modal, setModal] = useState(null);
-  const [editItem, setEditItem] = useState(null);
-  const [form, setForm] = useState({});
-  const [openEssId, setOpenEssId] = useState(null);
+  const [date, setDate] =
+    useState(today);
+
+  const [showCal, setShowCal] =
+    useState(false);
+
+  const [modal, setModal] =
+    useState(null);
+
+  const [editItem, setEditItem] =
+    useState(null);
+
+  const [form, setForm] =
+    useState({});
+
+  const [openEssId, setOpenEssId] =
+    useState(null);
 
   const {
     y,
@@ -374,439 +501,526 @@ export default function TodoTab({
     key
   } = fmtDate(date);
 
-  const isToday = key === toKey(today);
+  const isToday =
+    key === toKey(today);
 
-  const routines = data.routines || [];
-  const work = data.work || {};
-  const daily = data.daily || {};
-  const wish = data.wish || [];
-  const completed = data.completed || {};
+  const routines =
+    data.routines || [];
+
+  const work =
+    data.work || {};
+
+  const daily =
+    data.daily || {};
+
+  const wish =
+    data.wish || [];
+
+  const completed =
+    data.completed || {};
 
   /* =======================================================
      루틴
   ======================================================= */
 
   const visRoutines = useMemo(
-    () =>
-      routines
-        .filter(
-          r =>
-            r.addedDate <= key &&
-            !(r.removed && r.removed[key])
-        )
-        .sort(byOrder),
+    () => {
+      return routines
+        .filter(r => {
+          if (!r) return false;
+
+          if (
+            r.addedDate &&
+            r.addedDate > key
+          ) {
+            return false;
+          }
+
+          if (
+            r.removed &&
+            r.removed[key]
+          ) {
+            return false;
+          }
+
+          return true;
+        })
+        .slice()
+        .sort(byOrder);
+    },
     [routines, key]
   );
 
   /* =======================================================
      회사업무
+     
+     startDate 이후 계속 노출
+     완료한 당일은 노출
+     완료 다음날부터 숨김
   ======================================================= */
 
-  const todayWork = useMemo(() => {
-    const all = Object.values(work).flat();
+  const todayWork = useMemo(
+    () => {
+      const all =
+        Object.values(work)
+          .flat();
 
-    return all.filter(t => {
-      if (!t) return false;
-      if (!t.startDate) return false;
-      if (t.startDate > key) return false;
+      return all.filter(t => {
+        if (!t) return false;
 
-      if (
-        t.removed &&
-        t.removed[key]
-      ) {
-        return false;
-      }
+        if (!t.startDate) {
+          return false;
+        }
 
-      if (
-        t.doneDate &&
-        t.doneDate < key
-      ) {
-        return false;
-      }
+        if (t.startDate > key) {
+          return false;
+        }
 
-      return true;
-    });
-  }, [work, key]);
+        if (
+          t.removed &&
+          t.removed[key]
+        ) {
+          return false;
+        }
+
+        const completionDate =
+          getCompletionDate(
+            completed,
+            t.id,
+            key
+          ) ||
+          t.doneDate ||
+          t.completedDate ||
+          null;
+
+        if (
+          completionDate &&
+          completionDate < key
+        ) {
+          return false;
+        }
+
+        return true;
+      });
+    },
+    [
+      work,
+      completed,
+      key
+    ]
+  );
 
   /* =======================================================
      일상
+     
+     핵심 규칙:
+
+     1. 등록일 이전에는 안 보임
+     2. 미완료면 다음날 계속 이월
+     3. 완료한 당일은 완료 상태로 표시
+     4. 완료 다음날부터 숨김
+     5. completed[key]가 아니라
+        "실제 완료된 날짜"를 찾는다.
   ======================================================= */
 
-  const todayDaily = useMemo(() => {
-    const result = [];
+  const todayDaily = useMemo(
+    () => {
+      const result = [];
 
-    Object.keys(daily).forEach(dateKey => {
-      if (dateKey > key) return;
+      Object.keys(daily).forEach(
+        dateKey => {
+          if (dateKey > key) {
+            return;
+          }
 
-      const items = Array.isArray(
-        daily[dateKey]
-      )
-        ? daily[dateKey]
-        : [];
+          const items =
+            Array.isArray(
+              daily[dateKey]
+            )
+              ? daily[dateKey]
+              : [];
 
-      items.forEach(item => {
-        if (!item) return;
+          items.forEach(item => {
+            if (!item) return;
 
-        if (dateKey === key) {
-          result.push({
-            ...item,
-            addedDate:
+            const addedDate =
               item.addedDate ||
-              dateKey,
-            _originalDate: dateKey
-          });
+              dateKey;
 
+            /*
+             * 실제 완료일 확인.
+             *
+             * 새 데이터:
+             * completed[날짜][id]
+             *
+             * 구 데이터:
+             * completedDate
+             */
+            const completionDate =
+              getCompletionDate(
+                completed,
+                item.id,
+                key
+              ) ||
+              item.completedDate ||
+              null;
+
+            /*
+             * 완료한 다음날부터 숨김
+             */
+            if (
+              completionDate &&
+              completionDate < key
+            ) {
+              return;
+            }
+
+            /*
+             * 등록일 이전에는
+             * 절대 표시하지 않음
+             */
+            if (
+              addedDate > key
+            ) {
+              return;
+            }
+
+            result.push({
+              ...item,
+              addedDate,
+              _originalDate:
+                dateKey,
+              _completionDate:
+                completionDate,
+              _carried:
+                addedDate < key
+            });
+          });
+        }
+      );
+
+      /*
+       * 같은 id가 여러 bucket에
+       * 중복으로 존재할 수 있음.
+       */
+      const unique = [];
+
+      result.forEach(item => {
+        const existingIndex =
+          unique.findIndex(
+            x =>
+              x.id === item.id
+          );
+
+        if (
+          existingIndex === -1
+        ) {
+          unique.push(item);
           return;
         }
 
-        const done =
-          completed[key]?.[item.id] ||
-          item.completed === true ||
-          item.done === true ||
-          item.checked === true;
+        /*
+         * 같은 ID가 중복이라면
+         * 실제 등록일이 빠른 쪽을 우선.
+         */
+        const existing =
+          unique[
+            existingIndex
+          ];
 
-        if (!done) {
-          result.push({
-            ...item,
-            addedDate:
-              item.addedDate ||
-              dateKey,
-            _originalDate: dateKey,
-            _carried: true
-          });
+        if (
+          (
+            item.addedDate ||
+            ''
+          ) <
+          (
+            existing.addedDate ||
+            ''
+          )
+        ) {
+          unique[
+            existingIndex
+          ] = item;
         }
       });
-    });
 
-    const unique = [];
-
-    result.forEach(item => {
-      if (
-        !unique.some(
-          x => x.id === item.id
-        )
-      ) {
-        unique.push(item);
-      }
-    });
-
-    return unique.sort(byOrder);
-  }, [
-    daily,
-    key,
-    completed
-  ]);
+      return unique.sort(
+        byOrder
+      );
+    },
+    [
+      daily,
+      completed,
+      key
+    ]
+  );
 
   /* =======================================================
      위시
   ======================================================= */
 
-  const todayWish = useMemo(
-    () =>
-      wish
-        .filter(
-          w =>
-            !w.boughtDate ||
-            w.boughtDate === key
-        )
-        .slice()
-        .sort(byOrder),
-    [wish, key]
-  );
+  const todayWish =
+    useMemo(
+      () =>
+        wish
+          .filter(
+            w =>
+              !w.boughtDate ||
+              w.boughtDate === key
+          )
+          .slice()
+          .sort(byOrder),
+      [wish, key]
+    );
 
   /* =======================================================
      회사업무 정렬
   ======================================================= */
 
-  const PORDER = {
-    높음: 0,
-    중간: 1,
-    낮음: 2
-  };
+  const sortedWork =
+    useMemo(
+      () => {
+        return [...todayWork]
+          .sort(
+            (a, b) => {
+              const pa =
+                PORDER[
+                  a.priority
+                ] ?? 1;
 
-  const sortedWork = useMemo(() => {
-    return [...todayWork].sort(
-      (a, b) => {
-        const pa =
-          PORDER[a.priority] ?? 1;
+              const pb =
+                PORDER[
+                  b.priority
+                ] ?? 1;
 
-        const pb =
-          PORDER[b.priority] ?? 1;
+              if (
+                pa !== pb
+              ) {
+                return pa - pb;
+              }
 
-        if (pa !== pb) {
-          return pa - pb;
-        }
-
-        return (
-          (a.order ?? 9999) -
-          (b.order ?? 9999)
-        );
-      }
+              return (
+                (a.order ??
+                  9999) -
+                (b.order ??
+                  9999)
+              );
+            }
+          );
+      },
+      [todayWork]
     );
-  }, [todayWork]);
 
   /* =======================================================
      생필품 알림
   ======================================================= */
 
-  const urgentEss = useMemo(
-    () =>
-      (essItems || []).filter(e => {
-        if (e.notifyOff) {
-          return false;
-        }
+  const urgentEss =
+    useMemo(
+      () =>
+        (essItems || [])
+          .filter(e => {
+            if (
+              e.notifyOff
+            ) {
+              return false;
+            }
 
-        const h = e.history || [];
+            const h =
+              e.history || [];
 
-        if (h.length < 2) {
-          return false;
-        }
+            if (
+              h.length < 2
+            ) {
+              return false;
+            }
 
-        const sorted = [...h].sort(
-          (a, b) =>
-            new Date(a.date) -
-            new Date(b.date)
-        );
+            const sorted =
+              [...h].sort(
+                (a, b) =>
+                  new Date(
+                    a.date
+                  ) -
+                  new Date(
+                    b.date
+                  )
+              );
 
-        const gaps = [];
+            const gaps = [];
 
-        for (
-          let i = 1;
-          i < sorted.length;
-          i++
-        ) {
-          gaps.push(
-            (
+            for (
+              let i = 1;
+              i <
+                sorted.length;
+              i++
+            ) {
+              gaps.push(
+                (
+                  new Date(
+                    sorted[i]
+                      .date
+                  ) -
+                  new Date(
+                    sorted[
+                      i - 1
+                    ].date
+                  )
+                ) / 864e5
+              );
+            }
+
+            if (
+              !gaps.length
+            ) {
+              return false;
+            }
+
+            const avg =
+              Math.round(
+                gaps.reduce(
+                  (a, b) =>
+                    a + b,
+                  0
+                ) /
+                  gaps.length
+              );
+
+            const last =
               new Date(
-                sorted[i].date
-              ) -
-              new Date(
-                sorted[i - 1].date
-              )
-            ) / 864e5
-          );
-        }
+                sorted[
+                  sorted.length -
+                    1
+                ].date
+              );
 
-        const avg = Math.round(
-          gaps.reduce(
-            (a, b) => a + b,
-            0
-          ) / gaps.length
-        );
+            last.setDate(
+              last.getDate() +
+                avg
+            );
 
-        const last = new Date(
-          sorted[
-            sorted.length - 1
-          ].date
-        );
+            const diff =
+              Math.ceil(
+                (last -
+                  new Date()) /
+                  864e5
+              );
 
-        last.setDate(
-          last.getDate() + avg
-        );
-
-        const diff = Math.ceil(
-          (last - new Date()) /
-            864e5
-        );
-
-        return diff <= 10;
-      }),
-    [essItems]
-  );
-
-  /* =======================================================
-     완료 상태
-  ======================================================= */
-
-  const isDone = id =>
-    !!(
-      completed[key] &&
-      completed[key][id]
+            return diff <= 10;
+          }),
+      [essItems]
     );
 
   /* =======================================================
-     완료 토글
+     완료 상태
+     
+     선택된 날짜의 완료 여부만 확인
   ======================================================= */
 
-  const toggle = (
-    id,
-    type
-  ) => {
-    setData(p => {
-      const next = {
-        ...p,
-        completed: {
-          ...(p.completed || {})
-        }
-      };
-
-      const c = {
-        ...(next.completed[key] || {})
-      };
-
-      const currentlyDone =
-        !!c[id];
-
-      if (currentlyDone) {
-        delete c[id];
-      } else {
-        c[id] = true;
-      }
-
-      next.completed[key] = c;
-
-      /* 루틴 */
-
-      if (type === 'routine') {
-        next.routines = (
-          p.routines || []
-        ).map(r =>
-          r.id === id
-            ? {
-                ...r,
-                completed:
-                  !currentlyDone
-              }
-            : r
-        );
-      }
-
-      /* 일상 */
-
-      if (type === 'daily') {
-        const d = {
-          ...(p.daily || {})
-        };
-
-        Object.keys(d).forEach(
-          dk => {
-            d[dk] = (
-              d[dk] || []
-            ).map(item =>
-              item.id === id
-                ? {
-                    ...item,
-                    completed:
-                      !currentlyDone,
-                    completedDate:
-                      !currentlyDone
-                        ? key
-                        : null
-                  }
-                : item
-            );
-          }
-        );
-
-        next.daily = d;
-      }
-
-      return next;
-    });
-  };
-
-  /* =======================================================
-     회사업무 완료
-  ======================================================= */
-
-  const toggleWork = id => {
-    setData(p => {
-      const w = {
-        ...(p.work || {})
-      };
-
-      let currentItem = null;
-
-      Object.keys(w).forEach(
-        dk => {
-          const found = (
-            w[dk] || []
-          ).find(
-            t => t.id === id
-          );
-
-          if (found) {
-            currentItem = found;
-          }
-        }
-      );
-
-      const currentlyDone =
-        !!currentItem?.doneDate;
-
-      Object.keys(w).forEach(
-        dk => {
-          w[dk] = (
-            w[dk] || []
-          ).map(t =>
-            t.id === id
-              ? {
-                  ...t,
-                  doneDate:
-                    currentlyDone
-                      ? null
-                      : key,
-                  completed:
-                    !currentlyDone,
-                  completedDate:
-                    !currentlyDone
-                      ? key
-                      : null
-                }
-              : t
-          );
-        }
-      );
-
-      const c = {
-        ...(p.completed || {})
-      };
-
-      c[key] = {
-        ...(c[key] || {})
-      };
-
-      if (currentlyDone) {
-        delete c[key][id];
-      } else {
-        c[key][id] = true;
-      }
-
-      return {
-        ...p,
-        work: w,
-        completed: c
-      };
-    });
+  const isDone = id => {
+    return !!(
+      completed[key] &&
+      completed[key][id]
+    );
   };
 
   /* =======================================================
      진행률
+     
+     현재 화면에 실제 표시된 항목만 계산
+     
+     중복 ID 때문에 숫자가 꼬이지 않도록
+     유형까지 포함해서 구성.
   ======================================================= */
 
-  const allIds = [
-    ...visRoutines.map(r => r.id),
-    ...sortedWork.map(t => t.id),
-    ...todayDaily.map(t => t.id)
-  ];
+  const progressItems =
+    [
+      ...visRoutines.map(
+        item => ({
+          type: 'routine',
+          id: item.id
+        })
+      ),
+
+      ...sortedWork.map(
+        item => ({
+          type: 'work',
+          id: item.id
+        })
+      ),
+
+      ...todayDaily.map(
+        item => ({
+          type: 'daily',
+          id: item.id
+        })
+      )
+    ];
 
   const doneCount =
-    visRoutines.filter(r =>
-      isDone(r.id)
-    ).length +
-    sortedWork.filter(t =>
-      !!t.doneDate
-    ).length +
-    todayDaily.filter(t =>
-      isDone(t.id) ||
-      t.completed === true
+    progressItems.filter(
+      item => {
+        if (
+          item.type ===
+          'work'
+        ) {
+          const workItem =
+            sortedWork.find(
+              x =>
+                x.id ===
+                item.id
+            );
+
+          if (
+            !workItem
+          ) {
+            return false;
+          }
+
+          const completionDate =
+            getCompletionDate(
+              completed,
+              item.id,
+              key
+            ) ||
+            workItem.doneDate ||
+            workItem.completedDate ||
+            null;
+
+          return (
+            completionDate ===
+            key
+          );
+        }
+
+        const dailyItem =
+          todayDaily.find(
+            x =>
+              x.id ===
+              item.id
+          );
+
+        if (dailyItem) {
+          return (
+            dailyItem
+              ._completionDate ===
+              key
+          );
+        }
+
+        return isDone(
+          item.id
+        );
+      }
     ).length;
 
+  const totalCount =
+    progressItems.length;
+
   const progress =
-    allIds.length
+    totalCount
       ? Math.round(
           (doneCount /
-            allIds.length) *
+            totalCount) *
             100
         )
       : 0;
@@ -815,7 +1029,10 @@ export default function TodoTab({
      폼
   ======================================================= */
 
-  const F = (k, v) =>
+  const F = (
+    k,
+    v
+  ) =>
     setForm(p => ({
       ...p,
       [k]: v
@@ -827,9 +1044,12 @@ export default function TodoTab({
   ) => {
     setModal(type);
     setEditItem(item);
+
     setForm(
       item
-        ? { ...item }
+        ? {
+            ...item
+          }
         : {}
     );
   };
@@ -844,7 +1064,8 @@ export default function TodoTab({
     list.length
       ? Math.max(
           ...list.map(
-            x => x.order ?? 0
+            x =>
+              x.order ?? 0
           )
         ) + 1
       : 0;
@@ -856,20 +1077,23 @@ export default function TodoTab({
   const getDDay = due => {
     if (!due) return null;
 
-    const diff = Math.ceil(
-      (
-        new Date(
-          `${due}T00:00:00`
-        ) -
-        new Date(
-          `${key}T00:00:00`
-        )
-      ) / 864e5
-    );
+    const diff =
+      Math.ceil(
+        (
+          new Date(
+            `${due}T00:00:00`
+          ) -
+          new Date(
+            `${key}T00:00:00`
+          )
+        ) /
+          864e5
+      );
 
     if (diff < 0) {
       return {
-        color: '#c0392b',
+        color:
+          '#c0392b',
         label: `💀 D+${Math.abs(
           diff
         )}`,
@@ -879,31 +1103,39 @@ export default function TodoTab({
 
     if (diff === 0) {
       return {
-        color: '#e05252',
-        label: '🚨 D-DAY',
+        color:
+          '#e05252',
+        label:
+          '🚨 D-DAY',
         bold: true
       };
     }
 
     if (diff <= 2) {
       return {
-        color: '#e05252',
-        label: `D-${diff}`,
+        color:
+          '#e05252',
+        label:
+          `D-${diff}`,
         bold: false
       };
     }
 
     if (diff <= 7) {
       return {
-        color: '#e8a838',
-        label: `D-${diff}`,
+        color:
+          '#e8a838',
+        label:
+          `D-${diff}`,
         bold: false
       };
     }
 
     return {
-      color: '#52ae7a',
-      label: `D-${diff}`,
+      color:
+        '#52ae7a',
+      label:
+        `D-${diff}`,
       bold: false
     };
   };
@@ -913,7 +1145,9 @@ export default function TodoTab({
   ======================================================= */
 
   const saveRoutine = () => {
-    if (!form.title?.trim()) {
+    if (
+      !form.title?.trim()
+    ) {
       return;
     }
 
@@ -924,16 +1158,18 @@ export default function TodoTab({
       if (editItem) {
         return {
           ...p,
-          routines: list.map(r =>
-            r.id === editItem.id
-              ? {
-                  ...r,
-                  ...form,
-                  title:
-                    form.title.trim()
-                }
-              : r
-          )
+          routines:
+            list.map(r =>
+              r.id ===
+              editItem.id
+                ? {
+                    ...r,
+                    ...form,
+                    title:
+                      form.title.trim()
+                  }
+                : r
+            )
         };
       }
 
@@ -945,10 +1181,12 @@ export default function TodoTab({
             id: uid(),
             title:
               form.title.trim(),
-            addedDate: key,
+            addedDate:
+              key,
             order:
               nextOrder(list),
-            completed: false
+            completed:
+              false
           }
         ]
       };
@@ -991,8 +1229,12 @@ export default function TodoTab({
           false
       };
 
-      if (editItem?.id) {
-        Object.keys(w).forEach(
+      if (
+        editItem?.id
+      ) {
+        Object.keys(
+          w
+        ).forEach(
           dk => {
             w[dk] = (
               w[dk] || []
@@ -1004,24 +1246,32 @@ export default function TodoTab({
           }
         );
 
-        w[form.startDate] = [
-          ...(w[
-            form.startDate
-          ] || []
+        w[
+          form.startDate
+        ] = [
+          ...(
+            w[
+              form.startDate
+            ] || []
           ),
           item
         ];
       } else {
         const bucket =
-          w[form.startDate] ||
-          [];
+          w[
+            form.startDate
+          ] || [];
 
-        w[form.startDate] = [
+        w[
+          form.startDate
+        ] = [
           ...bucket,
           {
             ...item,
             order:
-              nextOrder(bucket)
+              nextOrder(
+                bucket
+              )
           }
         ];
       }
@@ -1040,7 +1290,9 @@ export default function TodoTab({
   ======================================================= */
 
   const saveDaily = () => {
-    if (!form.title?.trim()) {
+    if (
+      !form.title?.trim()
+    ) {
       return;
     }
 
@@ -1049,8 +1301,12 @@ export default function TodoTab({
         ...(p.daily || {})
       };
 
-      if (editItem?.id) {
-        Object.keys(d).forEach(
+      if (
+        editItem?.id
+      ) {
+        Object.keys(
+          d
+        ).forEach(
           dk => {
             d[dk] = (
               d[dk] || []
@@ -1078,10 +1334,14 @@ export default function TodoTab({
             ...form,
             title:
               form.title.trim(),
-            addedDate: key,
+            addedDate:
+              key,
             order:
-              nextOrder(bucket),
-            completed: false
+              nextOrder(
+                bucket
+              ),
+            completed:
+              false
           }
         ];
       }
@@ -1100,7 +1360,9 @@ export default function TodoTab({
   ======================================================= */
 
   const saveWish = () => {
-    if (!form.name?.trim()) {
+    if (
+      !form.name?.trim()
+    ) {
       return;
     }
 
@@ -1111,16 +1373,18 @@ export default function TodoTab({
       if (editItem) {
         return {
           ...p,
-          wish: list.map(w =>
-            w.id === editItem.id
-              ? {
-                  ...w,
-                  ...form,
-                  name:
-                    form.name.trim()
-                }
-              : w
-          )
+          wish:
+            list.map(w =>
+              w.id ===
+              editItem.id
+                ? {
+                    ...w,
+                    ...form,
+                    name:
+                      form.name.trim()
+                  }
+                : w
+            )
         };
       }
 
@@ -1133,9 +1397,12 @@ export default function TodoTab({
             ...form,
             name:
               form.name.trim(),
-            addedDate: key,
+            addedDate:
+              key,
             order:
-              nextOrder(list)
+              nextOrder(
+                list
+              )
           }
         ]
       };
@@ -1148,95 +1415,110 @@ export default function TodoTab({
      삭제
   ======================================================= */
 
-  const delRoutine = id =>
-    setData(p => ({
-      ...p,
-      routines: (
-        p.routines || []
-      ).map(r =>
-        r.id === id
-          ? {
-              ...r,
-              removed: {
-                ...(r.removed || {}),
-                [key]: true
+  const delRoutine =
+    id =>
+      setData(p => ({
+        ...p,
+        routines: (
+          p.routines || []
+        ).map(r =>
+          r.id === id
+            ? {
+                ...r,
+                removed: {
+                  ...(r.removed ||
+                    {}),
+                  [key]:
+                    true
+                }
               }
-            }
-          : r
-      )
-    }));
+            : r
+        )
+      }));
 
-  const delWork = id =>
-    setData(p => {
-      const w = {
-        ...(p.work || {})
-      };
+  const delWork =
+    id =>
+      setData(p => {
+        const w = {
+          ...(p.work || {})
+        };
 
-      Object.keys(w).forEach(
-        dk => {
-          w[dk] = (
-            w[dk] || []
-          ).filter(
-            t => t.id !== id
-          );
-        }
-      );
+        Object.keys(
+          w
+        ).forEach(
+          dk => {
+            w[dk] = (
+              w[dk] || []
+            ).filter(
+              t =>
+                t.id !== id
+            );
+          }
+        );
 
-      return {
+        return {
+          ...p,
+          work: w
+        };
+      });
+
+  const delDaily =
+    id =>
+      setData(p => {
+        const d = {
+          ...(p.daily || {})
+        };
+
+        Object.keys(
+          d
+        ).forEach(
+          dk => {
+            d[dk] = (
+              d[dk] || []
+            ).filter(
+              t =>
+                t.id !== id
+            );
+          }
+        );
+
+        return {
+          ...p,
+          daily: d
+        };
+      });
+
+  const delWish =
+    id =>
+      setData(p => ({
         ...p,
-        work: w
-      };
-    });
+        wish: (
+          p.wish || []
+        ).filter(
+          w =>
+            w.id !== id
+        )
+      }));
 
-  const delDaily = id =>
-    setData(p => {
-      const d = {
-        ...(p.daily || {})
-      };
-
-      Object.keys(d).forEach(
-        dk => {
-          d[dk] = (
-            d[dk] || []
-          ).filter(
-            t => t.id !== id
-          );
-        }
-      );
-
-      return {
+  const buyWish =
+    id =>
+      setData(p => ({
         ...p,
-        daily: d
-      };
-    });
-
-  const delWish = id =>
-    setData(p => ({
-      ...p,
-      wish: (
-        p.wish || []
-      ).filter(
-        w => w.id !== id
-      )
-    }));
-
-  const buyWish = id =>
-    setData(p => ({
-      ...p,
-      wish: (
-        p.wish || []
-      ).map(w =>
-        w.id === id
-          ? {
-              ...w,
-              boughtDate: key
-            }
-          : w
-      )
-    }));
+        wish: (
+          p.wish || []
+        ).map(w =>
+          w.id === id
+            ? {
+                ...w,
+                boughtDate:
+                  key
+              }
+            : w
+        )
+      }));
 
   /* =======================================================
-     순서 이동
+     순서 이동 - 공통
   ======================================================= */
 
   const swapOrder = (
@@ -1276,6 +1558,10 @@ export default function TodoTab({
     );
   };
 
+  /* =======================================================
+     루틴 이동
+  ======================================================= */
+
   const moveRoutine = (
     idx,
     dir
@@ -1292,26 +1578,34 @@ export default function TodoTab({
       ) => {
         setData(p => ({
           ...p,
-          routines: (
-            p.routines || []
-          ).map(r =>
-            r.id === aId
-              ? {
-                  ...r,
-                  order:
-                    aNew
-                }
-              : r.id === bId
-              ? {
-                  ...r,
-                  order:
-                    bNew
-                }
-              : r
-          )
+          routines:
+            (
+              p.routines ||
+              []
+            ).map(r =>
+              r.id ===
+              aId
+                ? {
+                    ...r,
+                    order:
+                      aNew
+                  }
+                : r.id ===
+                    bId
+                ? {
+                    ...r,
+                    order:
+                      bNew
+                  }
+                : r
+            )
         }));
       }
     );
+
+  /* =======================================================
+     일상 이동
+  ======================================================= */
 
   const moveDaily = (
     idx,
@@ -1332,18 +1626,22 @@ export default function TodoTab({
             ...(p.daily || {})
           };
 
-          Object.keys(d).forEach(
+          Object.keys(
+            d
+          ).forEach(
             dk => {
               d[dk] = (
                 d[dk] || []
               ).map(t =>
-                t.id === aId
+                t.id ===
+                aId
                   ? {
                       ...t,
                       order:
                         aNew
                     }
-                  : t.id === bId
+                  : t.id ===
+                      bId
                   ? {
                       ...t,
                       order:
@@ -1362,6 +1660,10 @@ export default function TodoTab({
       }
     );
 
+  /* =======================================================
+     위시 이동
+  ======================================================= */
+
   const moveWish = (
     idx,
     dir
@@ -1378,26 +1680,35 @@ export default function TodoTab({
       ) => {
         setData(p => ({
           ...p,
-          wish: (
-            p.wish || []
-          ).map(w =>
-            w.id === aId
-              ? {
-                  ...w,
-                  order:
-                    aNew
-                }
-              : w.id === bId
-              ? {
-                  ...w,
-                  order:
-                    bNew
-                }
-              : w
-          )
+          wish:
+            (
+              p.wish || []
+            ).map(w =>
+              w.id ===
+              aId
+                ? {
+                    ...w,
+                    order:
+                      aNew
+                  }
+                : w.id ===
+                    bId
+                ? {
+                    ...w,
+                    order:
+                      bNew
+                  }
+                : w
+            )
         }));
       }
     );
+
+  /* =======================================================
+     회사업무 이동
+     
+     우선순위 그룹 내부에서만 ↑↓
+  ======================================================= */
 
   const moveWork = (
     idx,
@@ -1406,13 +1717,21 @@ export default function TodoTab({
     const item =
       sortedWork[idx];
 
+    if (!item) {
+      return;
+    }
+
     const sameGroup =
       sortedWork.filter(
         t =>
-          (t.priority ||
-            '중간') ===
-          (item.priority ||
-            '중간')
+          (
+            t.priority ||
+            '중간'
+          ) ===
+          (
+            item.priority ||
+            '중간'
+          )
       );
 
     const gIdx =
@@ -1450,7 +1769,9 @@ export default function TodoTab({
         ...(p.work || {})
       };
 
-      Object.keys(w).forEach(
+      Object.keys(
+        w
+      ).forEach(
         dk => {
           w[dk] = (
             w[dk] || []
@@ -1479,52 +1800,311 @@ export default function TodoTab({
     });
   };
 
-  const workMoveable = idx => {
-    const item =
-      sortedWork[idx];
+  const workMoveable =
+    idx => {
+      const item =
+        sortedWork[idx];
 
-    const sameGroup =
-      sortedWork.filter(
-        t =>
-          (t.priority ||
-            '중간') ===
-          (item.priority ||
-            '중간')
-      );
+      if (!item) {
+        return {
+          canUp:
+            false,
+          canDown:
+            false
+        };
+      }
 
-    const gIdx =
-      sameGroup.findIndex(
-        t =>
-          t.id ===
-          item.id
-      );
+      const sameGroup =
+        sortedWork.filter(
+          t =>
+            (
+              t.priority ||
+              '중간'
+            ) ===
+            (
+              item.priority ||
+              '중간'
+            )
+        );
 
-    return {
-      canUp: gIdx > 0,
-      canDown:
-        gIdx <
-        sameGroup.length - 1
+      const gIdx =
+        sameGroup.findIndex(
+          t =>
+            t.id ===
+            item.id
+        );
+
+      return {
+        canUp:
+          gIdx > 0,
+        canDown:
+          gIdx <
+          sameGroup.length -
+            1
+      };
     };
-  };
 
   /* =======================================================
      생필품 알림 끄기
   ======================================================= */
 
-  const muteEss = id => {
-    setEssItems(p =>
-      (p || []).map(e =>
-        e.id === id
-          ? {
-              ...e,
-              notifyOff: true
-            }
-          : e
-      )
-    );
+  const muteEss =
+    id => {
+      setEssItems(
+        p =>
+          (p || []).map(
+            e =>
+              e.id === id
+                ? {
+                    ...e,
+                    notifyOff:
+                      true
+                  }
+                : e
+          )
+      );
 
-    setOpenEssId(null);
+      setOpenEssId(
+        null
+      );
+    };
+
+  /* =======================================================
+     완료 토글
+     
+     중요:
+     완료의 기준은 completed[날짜][id]
+
+     기존 work / daily에 남아있는
+     completed / doneDate / completedDate는
+     구버전 호환을 위해 함께 갱신.
+  ======================================================= */
+
+  const toggle = (
+    id,
+    type
+  ) => {
+    setData(p => {
+      const nextCompleted =
+        {
+          ...(p.completed || {})
+        };
+
+      const todayCompleted =
+        {
+          ...(nextCompleted[key] ||
+            {})
+        };
+
+      const currentlyDone =
+        !!todayCompleted[id];
+
+      if (
+        currentlyDone
+      ) {
+        delete todayCompleted[id];
+      } else {
+        todayCompleted[id] =
+          true;
+      }
+
+      nextCompleted[key] =
+        todayCompleted;
+
+      /*
+       * 루틴
+       */
+      if (
+        type ===
+        'routine'
+      ) {
+        return {
+          ...p,
+          completed:
+            nextCompleted
+        };
+      }
+
+      /*
+       * 일상
+       *
+       * 완료의 진짜 기준은
+       * completed[key][id]
+       *
+       * 기존 데이터와의 호환을 위해
+       * 완료일 정보도 갱신한다.
+       */
+      if (
+        type ===
+        'daily'
+      ) {
+        const d = {
+          ...(p.daily || {})
+        };
+
+        Object.keys(
+          d
+        ).forEach(
+          dk => {
+            d[dk] = (
+              d[dk] || []
+            ).map(item =>
+              item.id === id
+                ? {
+                    ...item,
+                    completed:
+                      !currentlyDone,
+                    completedDate:
+                      !currentlyDone
+                        ? key
+                        : null
+                  }
+                : item
+            );
+          }
+        );
+
+        return {
+          ...p,
+          daily: d,
+          completed:
+            nextCompleted
+        };
+      }
+
+      return {
+        ...p,
+        completed:
+          nextCompleted
+      };
+    });
   };
+
+  /* =======================================================
+     회사업무 완료
+     
+     오늘 완료 처리하면:
+     - completed[key][id] = true
+     - doneDate = key
+
+     다음날:
+     - 화면에서 숨김
+
+     완료 취소:
+     - 해당 날짜의 completed 삭제
+     - doneDate도 제거
+  ======================================================= */
+
+  const toggleWork =
+    id => {
+      setData(p => {
+        const workData = {
+          ...(p.work || {})
+        };
+
+        let currentItem =
+          null;
+
+        Object.keys(
+          workData
+        ).forEach(
+          dk => {
+            const found =
+              (
+                workData[dk] ||
+                []
+              ).find(
+                t =>
+                  t.id ===
+                  id
+              );
+
+            if (found) {
+              currentItem =
+                found;
+            }
+          }
+        );
+
+        const completedMap =
+          {
+            ...(p.completed ||
+              {})
+          };
+
+        const todayCompleted =
+          {
+            ...(completedMap[
+              key
+            ] || {})
+          };
+
+        const mapDone =
+          !!todayCompleted[
+            id
+          ];
+
+        /*
+         * 새 구조가 있으면 우선.
+         * 없으면 기존 doneDate를 확인해서
+         * 기존 데이터도 자연스럽게 처리.
+         */
+        const currentlyDone =
+          mapDone ||
+          currentItem?.doneDate ===
+            key;
+
+        if (
+          currentlyDone
+        ) {
+          delete todayCompleted[
+            id
+          ];
+        } else {
+          todayCompleted[
+            id
+          ] = true;
+        }
+
+        completedMap[key] =
+          todayCompleted;
+
+        Object.keys(
+          workData
+        ).forEach(
+          dk => {
+            workData[dk] = (
+              workData[dk] ||
+              []
+            ).map(t =>
+              t.id === id
+                ? {
+                    ...t,
+                    doneDate:
+                      currentlyDone
+                        ? null
+                        : key,
+                    completed:
+                      !currentlyDone,
+                    completedDate:
+                      !currentlyDone
+                        ? key
+                        : null
+                  }
+                : t
+            );
+          }
+        );
+
+        return {
+          ...p,
+          work:
+            workData,
+          completed:
+            completedMap
+        };
+      });
+    };
 
   /* =======================================================
      할 일 행
@@ -1593,19 +2173,25 @@ export default function TodoTab({
                     3
                 }}
               >
-                🕐 {item.timeText}
+                🕐{' '}
+                {
+                  item.timeText
+                }
               </div>
             )}
 
             <div
               style={{
-                fontSize: 13.5,
-                fontWeight: done
-                  ? 400
-                  : 600,
-                color: done
-                  ? 'var(--sub)'
-                  : 'var(--text)',
+                fontSize:
+                  13.5,
+                fontWeight:
+                  done
+                    ? 400
+                    : 600,
+                color:
+                  done
+                    ? 'var(--sub)'
+                    : 'var(--text)',
                 textDecoration:
                   done
                     ? 'line-through'
@@ -1635,14 +2221,17 @@ export default function TodoTab({
                 carryBadge && (
                   <span
                     style={{
-                      fontSize: 10,
+                      fontSize:
+                        10,
                       color:
                         carryBadge.color,
                       fontWeight:
                         700
                     }}
                   >
-                    {carryBadge.label}
+                    {
+                      carryBadge.label
+                    }
                   </span>
                 )}
 
@@ -1650,14 +2239,18 @@ export default function TodoTab({
                 completedBadge && (
                   <span
                     style={{
-                      fontSize: 10,
+                      fontSize:
+                        10,
                       color:
                         completedBadge.color,
                       fontWeight:
                         700
                     }}
                   >
-                    ✓ {completedBadge.label}
+                    ✓{' '}
+                    {
+                      completedBadge.label
+                    }
                   </span>
                 )}
             </div>
@@ -1665,22 +2258,27 @@ export default function TodoTab({
             {item.memo && (
               <div
                 style={{
-                  fontSize: 11.5,
+                  fontSize:
+                    11.5,
                   color:
                     'var(--sub)',
-                  marginTop: 4,
+                  marginTop:
+                    4,
                   lineHeight:
                     1.5
                 }}
               >
-                {item.memo}
+                {
+                  item.memo
+                }
               </div>
             )}
           </div>
 
           <div
             style={{
-              flexShrink: 0,
+              flexShrink:
+                0,
               display:
                 'flex',
               flexDirection:
@@ -1693,7 +2291,8 @@ export default function TodoTab({
             {badge && (
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize:
+                    11,
                   fontWeight:
                     badge.bold
                       ? 800
@@ -1706,7 +2305,9 @@ export default function TodoTab({
                     'nowrap'
                 }}
               >
-                {badge.label}
+                {
+                  badge.label
+                }
               </span>
             )}
 
@@ -1718,7 +2319,8 @@ export default function TodoTab({
               style={{
                 width: 24,
                 height: 24,
-                borderRadius: 8,
+                borderRadius:
+                  8,
                 marginTop: 1,
                 border: `2px solid ${
                   done
@@ -1742,7 +2344,8 @@ export default function TodoTab({
                   style={{
                     color:
                       '#fff',
-                    fontSize: 12,
+                    fontSize:
+                      12,
                     fontWeight:
                       700
                   }}
@@ -1764,7 +2367,9 @@ export default function TodoTab({
             onDown={onDown}
             onDel={onDel}
             canUp={canUp}
-            canDown={canDown}
+            canDown={
+              canDown
+            }
           />
         )}
       </div>
@@ -1787,7 +2392,8 @@ export default function TodoTab({
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
+          alignItems:
+            'center',
           justifyContent:
             'space-between',
           marginBottom: 16
@@ -1800,7 +2406,8 @@ export default function TodoTab({
                 new Date(d);
 
               n.setDate(
-                n.getDate() - 1
+                n.getDate() -
+                  1
               );
 
               return n;
@@ -1815,7 +2422,8 @@ export default function TodoTab({
             background:
               'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor:
+              'pointer'
           }}
         >
           ‹
@@ -1826,18 +2434,21 @@ export default function TodoTab({
             setShowCal(true)
           }
           style={{
-            textAlign: 'center',
+            textAlign:
+              'center',
             flex: 1,
             background:
               'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor:
+              'pointer'
           }}
         >
           <div
             style={{
               fontSize: 28,
-              fontWeight: 800,
+              fontWeight:
+                800,
               color:
                 'var(--text)',
               lineHeight: 1
@@ -1851,7 +2462,8 @@ export default function TodoTab({
               fontSize: 14,
               color:
                 'var(--accent)',
-              fontWeight: 600,
+              fontWeight:
+                600,
               marginTop: 2
             }}
           >
@@ -1869,7 +2481,8 @@ export default function TodoTab({
                 new Date(d);
 
               n.setDate(
-                n.getDate() + 1
+                n.getDate() +
+                  1
               );
 
               return n;
@@ -1884,7 +2497,8 @@ export default function TodoTab({
             background:
               'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor:
+              'pointer'
           }}
         >
           ›
@@ -1893,10 +2507,11 @@ export default function TodoTab({
 
       {/* 진행률 */}
 
-      {allIds.length > 0 && (
+      {totalCount > 0 && (
         <div
           style={{
-            marginBottom: 20
+            marginBottom:
+              20
           }}
         >
           <div
@@ -1908,7 +2523,8 @@ export default function TodoTab({
               fontSize: 11,
               color:
                 'var(--sub)',
-              marginBottom: 5
+              marginBottom:
+                5
             }}
           >
             <span>
@@ -1917,13 +2533,14 @@ export default function TodoTab({
 
             <span
               style={{
-                fontWeight: 700,
+                fontWeight:
+                  700,
                 color:
                   'var(--accent)'
               }}
             >
               {doneCount}/
-              {allIds.length}
+              {totalCount}
               {' · '}
               {progress}%
             </span>
@@ -1934,15 +2551,18 @@ export default function TodoTab({
               height: 6,
               background:
                 'var(--border)',
-              borderRadius: 6,
+              borderRadius:
+                6,
               overflow:
                 'hidden'
             }}
           >
             <div
               style={{
-                height: '100%',
-                borderRadius: 6,
+                height:
+                  '100%',
+                borderRadius:
+                  6,
                 width: `${progress}%`,
                 background:
                   'linear-gradient(90deg,var(--accent),var(--accent2))',
@@ -1960,7 +2580,8 @@ export default function TodoTab({
 
       <div
         style={{
-          marginBottom: 20
+          marginBottom:
+            20
         }}
       >
         <SectionHeader
@@ -1976,7 +2597,8 @@ export default function TodoTab({
           style={{
             background:
               'var(--card)',
-            borderRadius: 14,
+            borderRadius:
+              14,
             overflow:
               'hidden',
             boxShadow:
@@ -1995,7 +2617,8 @@ export default function TodoTab({
                   key={r.id}
                   item={{
                     ...r,
-                    _done: done
+                    _done:
+                      done
                   }}
                   onToggle={() =>
                     toggle(
@@ -2026,7 +2649,9 @@ export default function TodoTab({
                       1
                     )
                   }
-                  canUp={i > 0}
+                  canUp={
+                    i > 0
+                  }
                   canDown={
                     i <
                     visRoutines.length -
@@ -2053,7 +2678,8 @@ export default function TodoTab({
 
       <div
         style={{
-          marginBottom: 20
+          marginBottom:
+            20
         }}
       >
         <SectionHeader
@@ -2069,7 +2695,8 @@ export default function TodoTab({
           style={{
             background:
               'var(--card)',
-            borderRadius: 14,
+            borderRadius:
+              14,
             overflow:
               'hidden',
             boxShadow:
@@ -2081,19 +2708,37 @@ export default function TodoTab({
           {sortedWork.map(
             (t, i) => {
               const mv =
-                workMoveable(i);
-
-              const carry =
-                getCarryBadge(
-                  t.startDate,
-                  key
+                workMoveable(
+                  i
                 );
 
+              const completionDate =
+                getCompletionDate(
+                  completed,
+                  t.id,
+                  key
+                ) ||
+                t.doneDate ||
+                t.completedDate ||
+                null;
+
+              const isWorkDone =
+                completionDate ===
+                key;
+
+              const carry =
+                !isWorkDone
+                  ? getCarryBadge(
+                      t.startDate,
+                      key
+                    )
+                  : null;
+
               const completedBadge =
-                t.doneDate
+                isWorkDone
                   ? getCompletedBadge(
                       t.startDate,
-                      t.doneDate
+                      completionDate
                     )
                   : null;
 
@@ -2103,7 +2748,7 @@ export default function TodoTab({
                   item={{
                     ...t,
                     _done:
-                      !!t.doneDate
+                      isWorkDone
                   }}
                   onToggle={() =>
                     toggleWork(
@@ -2125,9 +2770,7 @@ export default function TodoTab({
                     t.due
                   )}
                   carryBadge={
-                    !t.doneDate
-                      ? carry
-                      : null
+                    carry
                   }
                   completedBadge={
                     completedBadge
@@ -2156,7 +2799,8 @@ export default function TodoTab({
                         display:
                           'flex',
                         gap: 6,
-                        marginTop: 4,
+                        marginTop:
+                          4,
                         flexWrap:
                           'wrap'
                       }}
@@ -2164,7 +2808,8 @@ export default function TodoTab({
                       {t.priority && (
                         <span
                           style={{
-                            fontSize: 10,
+                            fontSize:
+                              10,
                             padding:
                               '2px 7px',
                             borderRadius:
@@ -2192,7 +2837,8 @@ export default function TodoTab({
                       {t.due && (
                         <span
                           style={{
-                            fontSize: 10,
+                            fontSize:
+                              10,
                             padding:
                               '2px 7px',
                             borderRadius:
@@ -2203,7 +2849,8 @@ export default function TodoTab({
                               'var(--sub)'
                           }}
                         >
-                          ~{t.due}
+                          ~
+                          {t.due}
                         </span>
                       )}
                     </div>
@@ -2233,7 +2880,8 @@ export default function TodoTab({
 
       <div
         style={{
-          marginBottom: 20
+          marginBottom:
+            20
         }}
       >
         <SectionHeader
@@ -2249,7 +2897,8 @@ export default function TodoTab({
           style={{
             background:
               'var(--card)',
-            borderRadius: 14,
+            borderRadius:
+              14,
             overflow:
               'hidden',
             boxShadow:
@@ -2260,22 +2909,28 @@ export default function TodoTab({
         >
           {todayDaily.map(
             (t, i) => {
+              const completionDate =
+                t._completionDate ||
+                null;
+
               const done =
-                isDone(t.id) ||
-                t.completed ===
-                  true;
+                completionDate ===
+                  key ||
+                isDone(t.id);
 
               const carry =
-                getCarryBadge(
-                  t.addedDate,
-                  key
-                );
+                !done
+                  ? getCarryBadge(
+                      t.addedDate,
+                      key
+                    )
+                  : null;
 
               const completedBadge =
                 done
                   ? getCompletedBadge(
                       t.addedDate,
-                      t.completedDate ||
+                      completionDate ||
                         key
                     )
                   : null;
@@ -2285,7 +2940,8 @@ export default function TodoTab({
                   key={t.id}
                   item={{
                     ...t,
-                    _done: done
+                    _done:
+                      done
                   }}
                   onToggle={() =>
                     toggle(
@@ -2316,16 +2972,16 @@ export default function TodoTab({
                       1
                     )
                   }
-                  canUp={i > 0}
+                  canUp={
+                    i > 0
+                  }
                   canDown={
                     i <
                     todayDaily.length -
                       1
                   }
                   carryBadge={
-                    !done
-                      ? carry
-                      : null
+                    carry
                   }
                   completedBadge={
                     completedBadge
@@ -2346,170 +3002,218 @@ export default function TodoTab({
 
         {/* 구매 임박 생필품 */}
 
-        {urgentEss.length > 0 && (
+        {urgentEss.length >
+          0 && (
           <div
             style={{
-              marginTop: 10,
+              marginTop:
+                10,
               background:
                 'var(--yellow-bg)',
               border:
                 '1px solid var(--yellow)',
-              borderRadius: 12,
+              borderRadius:
+                12,
               padding:
                 '10px 14px'
             }}
           >
             <div
               style={{
-                fontSize: 11,
-                fontWeight: 700,
+                fontSize:
+                  11,
+                fontWeight:
+                  700,
                 color:
                   'var(--yellow)',
-                marginBottom: 6
+                marginBottom:
+                  6
               }}
             >
               🛒 구매 임박 생필품
             </div>
 
-            {urgentEss.map(e => {
-              const sorted = [
-                ...(e.history || [])
-              ].sort(
-                (a, b) =>
-                  new Date(a.date) -
-                  new Date(b.date)
-              );
-
-              const gaps = [];
-
-              for (
-                let i = 1;
-                i < sorted.length;
-                i++
-              ) {
-                gaps.push(
-                  (
-                    new Date(
-                      sorted[i].date
-                    ) -
-                    new Date(
-                      sorted[i - 1].date
-                    )
-                  ) / 864e5
-                );
-              }
-
-              const avg = Math.round(
-                gaps.reduce(
-                  (a, b) =>
-                    a + b,
-                  0
-                ) / gaps.length
-              );
-
-              const last =
-                new Date(
-                  sorted[
-                    sorted.length -
-                      1
-                  ].date
-                );
-
-              last.setDate(
-                last.getDate() +
-                  avg
-              );
-
-              const diff =
-                Math.ceil(
-                  (last -
-                    new Date()) /
-                    864e5
-                );
-
-              const isOpen =
-                openEssId === e.id;
-
-              return (
-                <div key={e.id}>
-                  <div
-                    onClick={() =>
-                      setOpenEssId(
-                        isOpen
-                          ? null
-                          : e.id
+            {urgentEss.map(
+              e => {
+                const sorted =
+                  [
+                    ...(e.history ||
+                      [])
+                  ].sort(
+                    (a, b) =>
+                      new Date(
+                        a.date
+                      ) -
+                      new Date(
+                        b.date
                       )
+                  );
+
+                const gaps =
+                  [];
+
+                for (
+                  let i = 1;
+                  i <
+                    sorted.length;
+                  i++
+                ) {
+                  gaps.push(
+                    (
+                      new Date(
+                        sorted[
+                          i
+                        ].date
+                      ) -
+                      new Date(
+                        sorted[
+                          i -
+                            1
+                        ].date
+                      )
+                    ) /
+                      864e5
+                  );
+                }
+
+                if (
+                  !gaps.length
+                ) {
+                  return null;
+                }
+
+                const avg =
+                  Math.round(
+                    gaps.reduce(
+                      (
+                        a,
+                        b
+                      ) =>
+                        a + b,
+                      0
+                    ) /
+                      gaps.length
+                  );
+
+                const last =
+                  new Date(
+                    sorted[
+                      sorted.length -
+                        1
+                    ].date
+                  );
+
+                last.setDate(
+                  last.getDate() +
+                    avg
+                );
+
+                const diff =
+                  Math.ceil(
+                    (last -
+                      new Date()) /
+                      864e5
+                  );
+
+                const isOpen =
+                  openEssId ===
+                  e.id;
+
+                return (
+                  <div
+                    key={
+                      e.id
                     }
-                    style={{
-                      fontSize: 12,
-                      color:
-                        'var(--text)',
-                      display:
-                        'flex',
-                      justifyContent:
-                        'space-between',
-                      padding:
-                        '5px 0',
-                      cursor:
-                        'pointer'
-                    }}
                   >
-                    <span>
-                      {e.name}
-                    </span>
-
-                    <span
-                      style={{
-                        color:
-                          diff < 0
-                            ? 'var(--red)'
-                            : 'var(--yellow)',
-                        fontWeight:
-                          700
-                      }}
-                    >
-                      {diff < 0
-                        ? `${Math.abs(
-                            diff
-                          )}일 지남 🔴`
-                        : diff === 0
-                        ? '오늘! 🔴'
-                        : `${diff}일 후 🟡`}
-                    </span>
-                  </div>
-
-                  {isOpen && (
-                    <button
+                    <div
                       onClick={() =>
-                        muteEss(
-                          e.id
+                        setOpenEssId(
+                          isOpen
+                            ? null
+                            : e.id
                         )
                       }
                       style={{
-                        width:
-                          '100%',
-                        margin:
-                          '2px 0 6px',
-                        padding: 8,
-                        borderRadius: 8,
-                        border:
-                          '1px solid var(--border)',
-                        background:
-                          'var(--card)',
+                        fontSize:
+                          12,
                         color:
-                          'var(--sub)',
-                        fontSize: 12,
-                        fontWeight: 700,
+                          'var(--text)',
+                        display:
+                          'flex',
+                        justifyContent:
+                          'space-between',
+                        padding:
+                          '5px 0',
                         cursor:
                           'pointer'
                       }}
                     >
-                      🔕 이 생필품 알림 끄기
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+                      <span>
+                        {
+                          e.name
+                        }
+                      </span>
+
+                      <span
+                        style={{
+                          color:
+                            diff <
+                            0
+                              ? 'var(--red)'
+                              : 'var(--yellow)',
+                          fontWeight:
+                            700
+                        }}
+                      >
+                        {diff <
+                        0
+                          ? `${Math.abs(
+                              diff
+                            )}일 지남 🔴`
+                          : diff ===
+                            0
+                          ? '오늘! 🔴'
+                          : `${diff}일 후 🟡`}
+                      </span>
+                    </div>
+
+                    {isOpen && (
+                      <button
+                        onClick={() =>
+                          muteEss(
+                            e.id
+                          )
+                        }
+                        style={{
+                          width:
+                            '100%',
+                          margin:
+                            '2px 0 6px',
+                          padding:
+                            8,
+                          borderRadius:
+                            8,
+                          border:
+                            '1px solid var(--border)',
+                          background:
+                            'var(--card)',
+                          color:
+                            'var(--sub)',
+                          fontSize:
+                            12,
+                          fontWeight:
+                            700,
+                          cursor:
+                            'pointer'
+                        }}
+                      >
+                        🔕 이 생필품 알림 끄기
+                      </button>
+                    )}
+                  </div>
+                );
+              }
+            )}
           </div>
         )}
       </div>
@@ -2520,21 +3224,25 @@ export default function TodoTab({
 
       <div
         style={{
-          marginBottom: 20
+          marginBottom:
+            20
         }}
       >
         <SectionHeader
           icon="🛍"
           title="위시리스트"
           color="#af52de"
-          count={todayWish.length}
+          count={
+            todayWish.length
+          }
         />
 
         <div
           style={{
             background:
               'var(--card)',
-            borderRadius: 14,
+            borderRadius:
+              14,
             overflow:
               'hidden',
             boxShadow:
@@ -2546,7 +3254,9 @@ export default function TodoTab({
           {todayWish.map(
             (w, i) => (
               <WishRow
-                key={w.id}
+                key={
+                  w.id
+                }
                 w={w}
                 onEdit={() =>
                   openModal(
@@ -2555,10 +3265,14 @@ export default function TodoTab({
                   )
                 }
                 onDel={() =>
-                  delWish(w.id)
+                  delWish(
+                    w.id
+                  )
                 }
                 onBuy={() =>
-                  buyWish(w.id)
+                  buyWish(
+                    w.id
+                  )
                 }
                 onUp={() =>
                   moveWish(
@@ -2572,7 +3286,9 @@ export default function TodoTab({
                     1
                   )
                 }
-                canUp={i > 0}
+                canUp={
+                  i > 0
+                }
                 canDown={
                   i <
                   todayWish.length -
@@ -2604,7 +3320,9 @@ export default function TodoTab({
             m,
             day
           }}
-          onSelect={setDate}
+          onSelect={
+            setDate
+          }
           onClose={() =>
             setShowCal(false)
           }
@@ -2615,18 +3333,22 @@ export default function TodoTab({
           루틴 모달
       =================================================== */}
 
-      {modal === 'routine' && (
+      {modal ===
+        'routine' && (
         <Modal
           title={`🔄 루틴 ${
             editItem
               ? '수정'
               : '추가'
           }`}
-          onClose={closeModal}
+          onClose={
+            closeModal
+          }
         >
           <div
             style={{
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <label style={lbl}>
@@ -2637,7 +3359,8 @@ export default function TodoTab({
               style={inp}
               placeholder="매일 반복할 일"
               value={
-                form.title || ''
+                form.title ||
+                ''
               }
               onChange={e =>
                 F(
@@ -2660,18 +3383,22 @@ export default function TodoTab({
           회사업무 모달
       =================================================== */}
 
-      {modal === 'work' && (
+      {modal ===
+        'work' && (
         <Modal
           title={`💼 회사업무 ${
             editItem
               ? '수정'
               : '추가'
           }`}
-          onClose={closeModal}
+          onClose={
+            closeModal
+          }
         >
           <div
             style={{
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <label style={lbl}>
@@ -2682,7 +3409,8 @@ export default function TodoTab({
               style={inp}
               placeholder="업무 내용"
               value={
-                form.title || ''
+                form.title ||
+                ''
               }
               onChange={e =>
                 F(
@@ -2695,9 +3423,11 @@ export default function TodoTab({
 
           <div
             style={{
-              display: 'flex',
+              display:
+                'flex',
               gap: 8,
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <div
@@ -2738,7 +3468,8 @@ export default function TodoTab({
                 style={inp}
                 type="date"
                 value={
-                  form.due || ''
+                  form.due ||
+                  ''
                 }
                 onChange={e =>
                   F(
@@ -2752,9 +3483,11 @@ export default function TodoTab({
 
           <div
             style={{
-              display: 'flex',
+              display:
+                'flex',
               gap: 8,
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <div
@@ -2821,7 +3554,8 @@ export default function TodoTab({
 
           <div
             style={{
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <label style={lbl}>
@@ -2832,7 +3566,8 @@ export default function TodoTab({
               style={inp}
               placeholder="참고 사항"
               value={
-                form.memo || ''
+                form.memo ||
+                ''
               }
               onChange={e =>
                 F(
@@ -2844,7 +3579,9 @@ export default function TodoTab({
           </div>
 
           <SaveBtn
-            onClick={saveWork}
+            onClick={
+              saveWork
+            }
           />
         </Modal>
       )}
@@ -2853,18 +3590,22 @@ export default function TodoTab({
           일상 모달
       =================================================== */}
 
-      {modal === 'daily' && (
+      {modal ===
+        'daily' && (
         <Modal
           title={`🌿 일상 ${
             editItem
               ? '수정'
               : '추가'
           }`}
-          onClose={closeModal}
+          onClose={
+            closeModal
+          }
         >
           <div
             style={{
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <label style={lbl}>
@@ -2875,7 +3616,8 @@ export default function TodoTab({
               style={inp}
               placeholder="할 일"
               value={
-                form.title || ''
+                form.title ||
+                ''
               }
               onChange={e =>
                 F(
@@ -2888,7 +3630,8 @@ export default function TodoTab({
 
           <div
             style={{
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <label style={lbl}>
@@ -2913,7 +3656,8 @@ export default function TodoTab({
 
           <div
             style={{
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <label style={lbl}>
@@ -2924,7 +3668,8 @@ export default function TodoTab({
               style={inp}
               placeholder="참고 사항"
               value={
-                form.memo || ''
+                form.memo ||
+                ''
               }
               onChange={e =>
                 F(
@@ -2936,7 +3681,9 @@ export default function TodoTab({
           </div>
 
           <SaveBtn
-            onClick={saveDaily}
+            onClick={
+              saveDaily
+            }
           />
         </Modal>
       )}
@@ -2945,18 +3692,22 @@ export default function TodoTab({
           위시 모달
       =================================================== */}
 
-      {modal === 'wish' && (
+      {modal ===
+        'wish' && (
         <Modal
           title={`🛍 위시리스트 ${
             editItem
               ? '수정'
               : '추가'
           }`}
-          onClose={closeModal}
+          onClose={
+            closeModal
+          }
         >
           <div
             style={{
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <label style={lbl}>
@@ -2967,7 +3718,8 @@ export default function TodoTab({
               style={inp}
               placeholder="뭘 살 거예요?"
               value={
-                form.name || ''
+                form.name ||
+                ''
               }
               onChange={e =>
                 F(
@@ -2980,7 +3732,8 @@ export default function TodoTab({
 
           <div
             style={{
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <label style={lbl}>
@@ -3005,7 +3758,8 @@ export default function TodoTab({
 
           <div
             style={{
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <label style={lbl}>
@@ -3014,7 +3768,8 @@ export default function TodoTab({
 
             <div
               style={{
-                display: 'flex',
+                display:
+                  'flex',
                 gap: 6
               }}
             >
@@ -3022,51 +3777,57 @@ export default function TodoTab({
                 '필요',
                 '가격 내려가면',
                 '언젠가'
-              ].map(p => (
-                <button
-                  key={p}
-                  onClick={() =>
-                    F(
-                      'priority',
-                      p
-                    )
-                  }
-                  style={{
-                    flex: 1,
-                    padding:
-                      '8px 4px',
-                    borderRadius: 8,
-                    border: `1.5px solid ${
-                      form.priority ===
-                      p
-                        ? 'var(--accent)'
-                        : 'var(--border)'
-                    }`,
-                    background:
-                      form.priority ===
-                      p
-                        ? 'var(--accent-bg)'
-                        : 'var(--card)',
-                    color:
-                      form.priority ===
-                      p
-                        ? 'var(--accent)'
-                        : 'var(--sub)',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor:
-                      'pointer'
-                  }}
-                >
-                  {p}
-                </button>
-              ))}
+              ].map(
+                p => (
+                  <button
+                    key={p}
+                    onClick={() =>
+                      F(
+                        'priority',
+                        p
+                      )
+                    }
+                    style={{
+                      flex: 1,
+                      padding:
+                        '8px 4px',
+                      borderRadius:
+                        8,
+                      border: `1.5px solid ${
+                        form.priority ===
+                        p
+                          ? 'var(--accent)'
+                          : 'var(--border)'
+                      }`,
+                      background:
+                        form.priority ===
+                        p
+                          ? 'var(--accent-bg)'
+                          : 'var(--card)',
+                      color:
+                        form.priority ===
+                        p
+                          ? 'var(--accent)'
+                          : 'var(--sub)',
+                      fontSize:
+                        11,
+                      fontWeight:
+                        600,
+                      cursor:
+                        'pointer'
+                    }}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
             </div>
           </div>
 
           <div
             style={{
-              marginBottom: 14
+              marginBottom:
+                14
             }}
           >
             <label style={lbl}>
@@ -3077,7 +3838,8 @@ export default function TodoTab({
               style={inp}
               placeholder="참고 사항"
               value={
-                form.memo || ''
+                form.memo ||
+                ''
               }
               onChange={e =>
                 F(
@@ -3089,7 +3851,9 @@ export default function TodoTab({
           </div>
 
           <SaveBtn
-            onClick={saveWish}
+            onClick={
+              saveWish
+            }
           />
         </Modal>
       )}
