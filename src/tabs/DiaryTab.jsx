@@ -12,28 +12,11 @@ const EMOTIONS = [
 ];
 
 
-// ─────────────────────────────────────────────
-// 기존 일기 → 새 blocks 구조 변환
-//
-// 기존:
-// {
-//   text: '본문',
-//   photos: [...]
-// }
-//
-// 새:
-// {
-//   blocks: [
-//     { type: 'text', id, content },
-//     { type: 'image', id, src, comment }
-//   ]
-// }
-//
-// 기존 데이터는 절대 버리지 않는다.
-// ─────────────────────────────────────────────
+/* =========================================================
+   기존 일기 → blocks 구조 변환
+========================================================= */
 
 const convertLegacyEntry = entry => {
-
   if (!entry) {
     return {
       title: '',
@@ -42,7 +25,6 @@ const convertLegacyEntry = entry => {
     };
   }
 
-  // 이미 새 구조라면 그대로 사용
   if (Array.isArray(entry.blocks)) {
     return {
       title: entry.title || '',
@@ -62,9 +44,7 @@ const convertLegacyEntry = entry => {
   }
 
   if (Array.isArray(entry.photos)) {
-
     entry.photos.forEach(photo => {
-
       if (!photo.src) return;
 
       blocks.push({
@@ -73,7 +53,6 @@ const convertLegacyEntry = entry => {
         src: photo.src,
         comment: photo.comment || ''
       });
-
     });
   }
 
@@ -84,6 +63,10 @@ const convertLegacyEntry = entry => {
   };
 };
 
+
+/* =========================================================
+   DiaryTab
+========================================================= */
 
 export default function DiaryTab({
   data,
@@ -108,6 +91,14 @@ export default function DiaryTab({
 
   const [uploading, setUploading] = useState(false);
 
+  /*
+   * AI 단계
+   *
+   * 0 = 아무것도 안 함
+   * 1 = 객관적 하루 정리
+   * 2 = 감정까지 포함한 하루 마무리
+   */
+  const [aiStage, setAiStage] = useState(0);
   const [aiReview, setAiReview] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -121,9 +112,9 @@ export default function DiaryTab({
   const savedPin = Store.get('jarvis-pin');
 
 
-  // ─────────────────────────────────────────────
-  // Draft
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     Draft
+  ========================================================= */
 
   const [draft, setDraft] = useState({
     title: '',
@@ -132,42 +123,54 @@ export default function DiaryTab({
   });
 
 
-  // ─────────────────────────────────────────────
-  // 날짜 변경 → 해당 일기 불러오기
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     날짜 변경 → 일기 불러오기
+  ========================================================= */
 
   useEffect(() => {
 
     const converted =
-      convertLegacyEntry(
-        entries[key]
-      );
+      convertLegacyEntry(entries[key]);
 
     setDraft(converted);
 
-    // AI는 현재 실제 API 연결 전
+    // 날짜가 바뀌면 AI 결과도 초기화
+    setAiStage(0);
     setAiReview(null);
 
   }, [key, savedEntry]);
 
 
-  // 기존 일기를 불러왔을 때도 본문 전체가 바로 보이도록
-  // textarea 높이를 실제 내용에 맞춰 다시 계산한다.
+  /* =========================================================
+     textarea 자동 높이
+  ========================================================= */
+
   useEffect(() => {
+
     requestAnimationFrame(() => {
+
       document
         .querySelectorAll('[data-diary-textarea]')
         .forEach(el => {
+
           el.style.height = 'auto';
-          el.style.height = `${Math.max(34, el.scrollHeight)}px`;
+
+          el.style.height =
+            `${Math.max(
+              34,
+              el.scrollHeight
+            )}px`;
+
         });
+
     });
+
   }, [draft]);
 
 
-  // ─────────────────────────────────────────────
-  // PIN
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     PIN 입력
+  ========================================================= */
 
   const tapPin = d => {
 
@@ -179,14 +182,25 @@ export default function DiaryTab({
 
     if (next.length === 4) {
 
-      const saved =
-        Store.get('jarvis-pin');
+      const saved = Store.get('jarvis-pin');
 
       if (!saved || next === saved) {
 
         setTimeout(() => {
+
+          /*
+           * 처음 입력한 PIN이면
+           * 바로 잠금 해제한다.
+           *
+           * 기존 구조를 유지한다.
+           */
+          if (!saved) {
+            Store.set('jarvis-pin', next);
+          }
+
           setUnlocked(true);
           setPin('');
+
         }, 150);
 
       } else {
@@ -202,18 +216,20 @@ export default function DiaryTab({
           );
 
         }, 300);
+
       }
     }
   };
 
 
-  // ─────────────────────────────────────────────
-  // 잠금 화면
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     잠금 화면
+  ========================================================= */
 
   if (!unlocked) {
 
     return (
+
       <div
         style={{
           display: 'flex',
@@ -249,7 +265,8 @@ export default function DiaryTab({
             fontSize: 13,
             color: 'var(--sub)',
             marginBottom: 32,
-            textAlign: 'center'
+            textAlign: 'center',
+            lineHeight: 1.7
           }}
         >
           {savedPin
@@ -265,7 +282,7 @@ export default function DiaryTab({
           }}
         >
 
-          {[0,1,2,3].map(i => (
+          {[0, 1, 2, 3].map(i => (
 
             <div
               key={i}
@@ -281,8 +298,7 @@ export default function DiaryTab({
                         : 'var(--accent)'
                     )
                     : 'var(--border)',
-                transition:
-                  'background 0.2s'
+                transition: 'background 0.2s'
               }}
             />
 
@@ -294,14 +310,12 @@ export default function DiaryTab({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns:
-              'repeat(3,72px)',
+            gridTemplateColumns: 'repeat(3,72px)',
             gap: 12
           }}
         >
 
-          {[1,2,3,4,5,6,7,8,9,'',0,'⌫']
-            .map((d, i) => (
+          {[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((d, i) => (
 
             <button
               key={i}
@@ -315,10 +329,7 @@ export default function DiaryTab({
               style={{
                 height: 72,
                 borderRadius: 16,
-                fontSize:
-                  d === '⌫'
-                    ? 20
-                    : 24,
+                fontSize: d === '⌫' ? 20 : 24,
                 fontWeight: 600,
                 background:
                   d === ''
@@ -351,9 +362,9 @@ export default function DiaryTab({
   }
 
 
-  // ─────────────────────────────────────────────
-  // Draft helper
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     Draft helper
+  ========================================================= */
 
   const updateDraft = changes => {
 
@@ -361,128 +372,134 @@ export default function DiaryTab({
       ...prev,
       ...changes
     }));
+
+    /*
+     * 내용을 수정하면 기존 AI 결과는 무효화.
+     *
+     * 이전 내용을 수정했는데 예전 AI 분석이
+     * 그대로 남아있는 문제를 방지한다.
+     */
+    setAiStage(0);
+    setAiReview(null);
   };
 
 
-  // ─────────────────────────────────────────────
-  // Text block
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     Text block
+  ========================================================= */
 
-  const updateTextBlock =
-    (blockId, content) => {
+  const updateTextBlock = (blockId, content) => {
 
-      setDraft(prev => ({
+    setDraft(prev => ({
 
-        ...prev,
+      ...prev,
 
-        blocks:
-          prev.blocks.map(block =>
-            block.id === blockId
-              ? {
-                  ...block,
-                  content
-                }
-              : block
-          )
+      blocks: prev.blocks.map(block =>
+        block.id === blockId
+          ? {
+              ...block,
+              content
+            }
+          : block
+      )
 
-      }));
+    }));
+
+    setAiStage(0);
+    setAiReview(null);
+  };
+
+
+  /* =========================================================
+     사진 메모
+  ========================================================= */
+
+  const updateImageComment = (blockId, comment) => {
+
+    setDraft(prev => ({
+
+      ...prev,
+
+      blocks: prev.blocks.map(block =>
+        block.id === blockId
+          ? {
+              ...block,
+              comment
+            }
+          : block
+      )
+
+    }));
+
+    setAiStage(0);
+    setAiReview(null);
+  };
+
+
+  /* =========================================================
+     글 블록 추가
+  ========================================================= */
+
+  const addTextAfter = blockId => {
+
+    const newBlock = {
+      id: uid(),
+      type: 'text',
+      content: ''
     };
 
+    setDraft(prev => {
 
-  // ─────────────────────────────────────────────
-  // 사진 메모
-  // ─────────────────────────────────────────────
-
-  const updateImageComment =
-    (blockId, comment) => {
-
-      setDraft(prev => ({
-
-        ...prev,
-
-        blocks:
-          prev.blocks.map(block =>
-            block.id === blockId
-              ? {
-                  ...block,
-                  comment
-                }
-              : block
-          )
-
-      }));
-    };
-
-
-  // ─────────────────────────────────────────────
-  // 글 블록 추가
-  // ─────────────────────────────────────────────
-
-  const addTextAfter =
-    blockId => {
-
-      const newBlock = {
-        id: uid(),
-        type: 'text',
-        content: ''
-      };
-
-      setDraft(prev => {
-
-        const index =
-          prev.blocks.findIndex(
-            b => b.id === blockId
-          );
-
-        if (index === -1) {
-
-          return {
-            ...prev,
-            blocks: [
-              ...prev.blocks,
-              newBlock
-            ]
-          };
-        }
-
-        const blocks =
-          [...prev.blocks];
-
-        blocks.splice(
-          index + 1,
-          0,
-          newBlock
+      const index =
+        prev.blocks.findIndex(
+          b => b.id === blockId
         );
+
+      if (index === -1) {
 
         return {
           ...prev,
-          blocks
+          blocks: [
+            ...prev.blocks,
+            newBlock
+          ]
         };
-      });
+      }
 
-      // 새 글 입력창으로 이동
-      setTimeout(() => {
+      const blocks = [...prev.blocks];
 
-        const el =
-          document.querySelector(
-            `[data-block-id="${newBlock.id}"]`
-          );
+      blocks.splice(
+        index + 1,
+        0,
+        newBlock
+      );
 
-        if (el) {
-          el.focus();
-        }
+      return {
+        ...prev,
+        blocks
+      };
 
-      }, 50);
-    };
+    });
+
+    setAiStage(0);
+    setAiReview(null);
+
+    setTimeout(() => {
+
+      const el =
+        document.querySelector(
+          `[data-block-id="${newBlock.id}"]`
+        );
+
+      if (el) el.focus();
+
+    }, 50);
+  };
 
 
-  // ─────────────────────────────────────────────
-  // 사진 블록 추가
-  //
-  // 마지막 위치에 사진을 넣는다.
-  // 현재 글 아래에서 사진을 넣고
-  // 그 뒤에 자동으로 글 블록을 만든다.
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     사진 추가
+  ========================================================= */
 
   const addPhotos = async files => {
 
@@ -491,7 +508,6 @@ export default function DiaryTab({
 
     if (!selected.length) return;
 
-
     setUploading(true);
 
     try {
@@ -499,25 +515,25 @@ export default function DiaryTab({
       const imageBlocks =
         await Promise.all(
 
-          selected.map(
-            async file => {
+          selected.map(async file => {
 
-              const compressed =
-                await compressImage(file);
+            const compressed =
+              await compressImage(file);
 
-              const src =
-                await uploadToCloudinary(
-                  compressed
-                );
+            const src =
+              await uploadToCloudinary(
+                compressed
+              );
 
-              return {
-                id: uid(),
-                type: 'image',
-                src,
-                comment: ''
-              };
-            }
-          )
+            return {
+              id: uid(),
+              type: 'image',
+              src,
+              comment: ''
+            };
+
+          })
+
         );
 
 
@@ -525,8 +541,12 @@ export default function DiaryTab({
 
         let blocks = [...prev.blocks];
 
-        // 이미 마지막에 있는 빈 글칸은 재사용한다.
-        const last = blocks[blocks.length - 1];
+        /*
+         * 마지막에 있는 빈 글칸 재사용
+         */
+        const last =
+          blocks[blocks.length - 1];
+
         if (
           last &&
           last.type === 'text' &&
@@ -537,7 +557,9 @@ export default function DiaryTab({
 
         blocks.push(...imageBlocks);
 
-        // 사진 뒤 글칸은 항상 하나만 만든다.
+        /*
+         * 사진 뒤에는 글칸 하나
+         */
         blocks.push({
           id: uid(),
           type: 'text',
@@ -548,7 +570,11 @@ export default function DiaryTab({
           ...prev,
           blocks
         };
+
       });
+
+      setAiStage(0);
+      setAiReview(null);
 
     } catch (error) {
 
@@ -564,389 +590,585 @@ export default function DiaryTab({
     } finally {
 
       setUploading(false);
-
     }
   };
 
 
-  // ─────────────────────────────────────────────
-  // 사진 삭제
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     사진 삭제
+  ========================================================= */
 
-  const removeImageBlock =
-    blockId => {
+  const removeImageBlock = blockId => {
 
-      if (
-        !window.confirm(
-          '이 사진을 삭제할까요?\n저장하면 영구적으로 삭제됩니다.'
-        )
-      ) {
-        return;
-      }
+    if (
+      !window.confirm(
+        '이 사진을 삭제할까요?\n저장하면 영구적으로 삭제됩니다.'
+      )
+    ) {
+      return;
+    }
 
+    setDraft(prev => {
 
-      setDraft(prev => {
-
-        const index = prev.blocks.findIndex(
+      const index =
+        prev.blocks.findIndex(
           block => block.id === blockId
         );
 
-        if (index === -1) return prev;
+      if (index === -1) return prev;
 
-        const blocks = [...prev.blocks];
-        blocks.splice(index, 1);
+      const blocks = [...prev.blocks];
 
-        // 사진 뒤에 자동 생성된 빈 글칸도 함께 삭제한다.
-        const next = blocks[index];
-        if (
-          next &&
-          next.type === 'text' &&
-          !(next.content || '').trim()
-        ) {
-          blocks.splice(index, 1);
-        }
+      blocks.splice(index, 1);
 
-        // 글칸이 하나도 없을 때만 하나 만든다.
-        if (!blocks.some(b => b.type === 'text')) {
-          blocks.push({
-            id: uid(),
-            type: 'text',
-            content: ''
-          });
-        }
-
-        return {
-          ...prev,
-          blocks
-        };
-      });
-    };
-
-
-  // ─────────────────────────────────────────────
-  // 사진 압축
-  // ─────────────────────────────────────────────
-
-  const compressImage =
-    file =>
-      new Promise(resolve => {
-
-        const img =
-          new Image();
-
-        const reader =
-          new FileReader();
-
-
-        reader.onload = e => {
-          img.src =
-            e.target.result;
-        };
-
-
-        img.onload = () => {
-
-          const MAX = 1600;
-
-          let {
-            width,
-            height
-          } = img;
-
-
-          if (
-            width > height &&
-            width > MAX
-          ) {
-
-            height =
-              height * MAX / width;
-
-            width = MAX;
-
-          } else if (
-            height > MAX
-          ) {
-
-            width =
-              width * MAX / height;
-
-            height = MAX;
-          }
-
-
-          const canvas =
-            document.createElement(
-              'canvas'
-            );
-
-          canvas.width =
-            width;
-
-          canvas.height =
-            height;
-
-
-          canvas
-            .getContext('2d')
-            .drawImage(
-              img,
-              0,
-              0,
-              width,
-              height
-            );
-
-
-          canvas.toBlob(
-            blob =>
-              resolve(
-                blob || file
-              ),
-            'image/jpeg',
-            0.8
-          );
-        };
-
-
-        img.onerror =
-          () => resolve(file);
-
-
-        reader.readAsDataURL(file);
-
-      });
-
-
-  // ─────────────────────────────────────────────
-  // Cloudinary
-  // ─────────────────────────────────────────────
-
-  const uploadToCloudinary =
-    async file => {
-
-      const formData =
-        new FormData();
-
-
-      formData.append(
-        'file',
-        file
-      );
-
-
-      formData.append(
-        'upload_preset',
-        process.env
-          .REACT_APP_CLOUDINARY_UPLOAD_PRESET
-      );
-
-
-      const res =
-        await fetch(
-          `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
-          {
-            method: 'POST',
-            body: formData
-          }
-        );
-
-
-      const result =
-        await res.json();
-
+      /*
+       * 사진 뒤 빈 글칸 제거
+       */
+      const next = blocks[index];
 
       if (
-        !res.ok ||
-        !result.secure_url
+        next &&
+        next.type === 'text' &&
+        !(next.content || '').trim()
       ) {
-
-        throw new Error(
-          '사진 업로드에 실패했습니다.'
-        );
+        blocks.splice(index, 1);
       }
 
+      /*
+       * 글칸이 하나도 없으면 하나 생성
+       */
+      if (
+        !blocks.some(
+          b => b.type === 'text'
+        )
+      ) {
 
-      return result.secure_url;
-    };
+        blocks.push({
+          id: uid(),
+          type: 'text',
+          content: ''
+        });
+
+      }
+
+      return {
+        ...prev,
+        blocks
+      };
+
+    });
+
+    setAiStage(0);
+    setAiReview(null);
+  };
 
 
-  // ─────────────────────────────────────────────
-  // 저장
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     사진 압축
+  ========================================================= */
 
-  const handleSave =
-    async () => {
+  const compressImage = file =>
+    new Promise(resolve => {
 
-      setUploading(true);
+      const img = new Image();
+      const reader = new FileReader();
 
-      try {
+      reader.onload = e => {
+        img.src = e.target.result;
+      };
 
-        // 혹시 기존 형식 사진이 남아있다면
-        // src가 있는 것만 저장
-        const blocks =
-          draft.blocks
-            .filter(block => {
+      img.onload = () => {
 
-              if (
-                block.type === 'text'
-              ) {
+        const MAX = 1600;
 
-                return true;
-              }
+        let {
+          width,
+          height
+        } = img;
 
-              if (
-                block.type === 'image'
-              ) {
+        if (
+          width > height &&
+          width > MAX
+        ) {
 
-                return !!block.src;
-              }
+          height =
+            height * MAX / width;
 
-              return false;
-            })
-            .map(block => {
+          width = MAX;
 
-              if (
-                block.type === 'text'
-              ) {
+        } else if (
+          height > MAX
+        ) {
 
-                return {
-                  id: block.id,
-                  type: 'text',
-                  content:
-                    block.content || ''
-                };
-              }
+          width =
+            width * MAX / height;
 
+          height = MAX;
+
+        }
+
+        const canvas =
+          document.createElement('canvas');
+
+        canvas.width = width;
+        canvas.height = height;
+
+        canvas
+          .getContext('2d')
+          .drawImage(
+            img,
+            0,
+            0,
+            width,
+            height
+          );
+
+        canvas.toBlob(
+          blob =>
+            resolve(
+              blob || file
+            ),
+          'image/jpeg',
+          0.8
+        );
+      };
+
+      img.onerror =
+        () => resolve(file);
+
+      reader.readAsDataURL(file);
+
+    });
+
+
+  /* =========================================================
+     Cloudinary
+  ========================================================= */
+
+  const uploadToCloudinary = async file => {
+
+    const formData =
+      new FormData();
+
+    formData.append(
+      'file',
+      file
+    );
+
+    formData.append(
+      'upload_preset',
+      process.env
+        .REACT_APP_CLOUDINARY_UPLOAD_PRESET
+    );
+
+    const res =
+      await fetch(
+        `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
+        {
+          method: 'POST',
+          body: formData
+        }
+      );
+
+    const result =
+      await res.json();
+
+    if (
+      !res.ok ||
+      !result.secure_url
+    ) {
+
+      throw new Error(
+        '사진 업로드에 실패했습니다.'
+      );
+    }
+
+    return result.secure_url;
+  };
+
+
+  /* =========================================================
+     저장
+  ========================================================= */
+
+  const handleSave = async () => {
+
+    setUploading(true);
+
+    try {
+
+      const blocks =
+        draft.blocks
+          .filter(block => {
+
+            if (
+              block.type === 'text'
+            ) {
+              return true;
+            }
+
+            if (
+              block.type === 'image'
+            ) {
+              return !!block.src;
+            }
+
+            return false;
+
+          })
+          .map(block => {
+
+            if (
+              block.type === 'text'
+            ) {
 
               return {
                 id: block.id,
-                type: 'image',
-                src: block.src,
-                comment:
-                  block.comment || ''
+                type: 'text',
+                content:
+                  block.content || ''
               };
 
-            });
+            }
+
+            return {
+              id: block.id,
+              type: 'image',
+              src: block.src,
+              comment:
+                block.comment || ''
+            };
+
+          });
 
 
-        const entry = {
+      const entry = {
 
-          date: key,
+        date: key,
 
-          title:
-            draft.title || '',
+        title:
+          draft.title || '',
 
-          emotion:
-            draft.emotion || '',
+        emotion:
+          draft.emotion || '',
 
-          blocks
-        };
+        blocks
+
+      };
 
 
-        // 날짜 하나만 저장
-        await saveDiaryEntry(
-          key,
-          entry
+      await saveDiaryEntry(
+        key,
+        entry
+      );
+
+
+      alert(
+        '저장됐어요! 🐷'
+      );
+
+    } catch (error) {
+
+      console.error(
+        'Diary 저장 실패:',
+        error
+      );
+
+      alert(
+        '저장에 실패했어요.\n\n' +
+        '기존 일기는 변경되지 않았어요.\n' +
+        '다시 시도해주세요.'
+      );
+
+    } finally {
+
+      setUploading(false);
+    }
+  };
+
+
+  /* =========================================================
+     실제 일기 내용 추출
+  ========================================================= */
+
+  const getDiaryText = () => {
+
+    const texts =
+      draft.blocks
+        .filter(
+          block =>
+            block.type === 'text'
+        )
+        .map(
+          block =>
+            (block.content || '').trim()
+        )
+        .filter(Boolean);
+
+    const imageComments =
+      draft.blocks
+        .filter(
+          block =>
+            block.type === 'image' &&
+            (block.comment || '').trim()
+        )
+        .map(
+          block =>
+            `[사진 메모] ${block.comment.trim()}`
         );
 
+    return [
+      draft.title
+        ? `[제목] ${draft.title}`
+        : '',
 
-        alert(
-          '저장됐어요! 🐷'
-        );
+      ...texts,
 
-      } catch (error) {
+      ...imageComments
 
-        console.error(
-          'Diary 저장 실패:',
-          error
-        );
-
-
-        alert(
-          '저장에 실패했어요.\n\n' +
-          '기존 일기는 변경되지 않았어요.\n' +
-          '다시 시도해주세요.'
-        );
-
-      } finally {
-
-        setUploading(false);
-      }
-    };
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+  };
 
 
-  // ─────────────────────────────────────────────
-  // 내용 여부
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     내용 여부
+  ========================================================= */
 
-  const hasContent =
-    draft.title ||
-    draft.emotion ||
+  const diaryText =
+    getDiaryText();
+
+  const hasPhotos =
     draft.blocks.some(
       block =>
-        (
-          block.type === 'text' &&
-          block.content
-        ) ||
-        block.type === 'image'
+        block.type === 'image' &&
+        block.src
+    );
+
+  const hasContent =
+    !!(
+      diaryText.trim() ||
+      draft.emotion ||
+      hasPhotos
     );
 
 
-  // ─────────────────────────────────────────────
-  // AI
-  //
-  // 실제 AI API 연결 전의 자리만 유지.
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     AI 1단계
+     
+     객관적인 하루 정리
+     
+     실제 API 연결 전이므로 현재는
+     구조/UX만 먼저 만들어둔다.
+  ========================================================= */
 
-  const handleAiReview =
-    async () => {
+  const createStageOneReview = () => {
 
-      if (!hasContent) {
+    const text =
+      diaryText.trim();
 
-        alert(
-          '먼저 오늘의 기록을 남겨주세요.'
-        );
+    const emotion =
+      draft.emotion || '기록되지 않음';
 
-        return;
+    let summary = '';
+
+    if (text) {
+
+      /*
+       * 실제 AI가 들어갈 자리를 명확하게 유지.
+       *
+       * 지금은 입력된 내용을 기반으로
+       * 지나치게 감정적으로 해석하지 않는다.
+       */
+
+      summary =
+        `오늘은 "${text.slice(0, 120)}${text.length > 120 ? '…' : ''}"에 대한 기록을 남겼어요.`;
+
+    } else if (hasPhotos) {
+
+      summary =
+        '오늘은 사진으로 하루의 장면을 남겼어요.';
+
+    } else {
+
+      summary =
+        '오늘의 기록이 많지는 않지만, 하루를 남겨두었다는 것 자체가 의미 있어요.';
+
+    }
+
+    return {
+      stage: 1,
+
+      review:
+        `오늘의 기록을 객관적으로 돌아보면,\n\n` +
+        `${summary}\n\n` +
+        `오늘 선택한 기분은 ${emotion}이에요.\n\n` +
+        `지금 단계에서는 잘잘못을 판단하기보다, ` +
+        `오늘 실제로 어떤 일이 있었는지를 먼저 바라보는 데 집중해요.`,
+
+      createdAt:
+        new Date().toISOString()
+    };
+  };
+
+
+  /* =========================================================
+     AI 2단계
+     
+     감정까지 반영한 하루 마무리
+  ========================================================= */
+
+  const createStageTwoReview = () => {
+
+    const emotion =
+      draft.emotion || '평범';
+
+    const text =
+      diaryText.trim();
+
+    let emotionalComment = '';
+
+    switch (emotion) {
+
+      case '행복':
+        emotionalComment =
+          '오늘의 좋은 감정이 생긴 이유를 가볍게 기억해두면 좋겠어요. 특별히 큰 일이 아니더라도, 나를 기분 좋게 만든 순간은 충분히 기록할 가치가 있어요.';
+        break;
+
+      case '좋음':
+        emotionalComment =
+          '전체적으로 괜찮았던 하루로 보이지만, 무엇이 좋았는지를 나중에 다시 떠올릴 수 있도록 작은 이유 하나 정도는 기억해두면 좋아요.';
+        break;
+
+      case '평범':
+        emotionalComment =
+          '특별히 크게 흔들리지 않은 하루였던 것 같아요. 모든 하루가 특별할 필요는 없어요. 평범하게 지나간 날도 나중에는 하나의 기록이 돼요.';
+        break;
+
+      case '슬픔':
+        emotionalComment =
+          '오늘은 마음이 조금 무거웠던 것 같아요. 지금 당장 긍정적으로 바꾸려고 하기보다, 그렇게 느꼈다는 사실 자체를 인정해주는 편이 더 자연스러워요.';
+        break;
+
+      case '화남':
+        emotionalComment =
+          '오늘은 불편하거나 억울하거나 답답했던 감정이 있었던 것 같아요. 화가 났다는 감정과 실제 상황에서 내가 어떻게 행동했는지는 분리해서 바라보는 게 좋아요.';
+        break;
+
+      case '지침':
+        emotionalComment =
+          '오늘은 에너지가 많이 소모된 하루였던 것 같아요. 생산적인 하루였는지를 따지기보다, 지금 내가 얼마나 지쳐 있는지를 먼저 인정해주는 게 좋아요.';
+        break;
+
+      default:
+        emotionalComment =
+          '오늘의 감정을 억지로 정의할 필요는 없어요. 기록을 남겼다는 것만으로도 충분해요.';
+    }
+
+
+    const factual =
+      text
+        ? '오늘 있었던 일과 지금 느끼는 감정은 서로 다른 층위에서 바라볼 필요가 있어요.'
+        : '오늘의 구체적인 상황보다 현재 느끼는 감정이 더 선명하게 남아 있는 것 같아요.';
+
+
+    return {
+      stage: 2,
+
+      review:
+        `오늘 하루를 조금 더 깊게 바라보면,\n\n` +
+        `${factual}\n\n` +
+        `${emotionalComment}\n\n` +
+        `오늘의 기분은 '${emotion}'으로 기록했어요. ` +
+        `내일의 내가 오늘의 나를 평가하기보다는, ` +
+        `그때 왜 그렇게 느꼈는지를 이해할 수 있도록 남겨두는 게 좋아요.\n\n` +
+        `오늘은 여기까지. 잘한 일도, 아쉬운 일도 일단 오늘의 일부로 두세요.`,
+
+      createdAt:
+        new Date().toISOString()
+    };
+  };
+
+
+  /* =========================================================
+     오늘 마무리
+     
+     1단계 → 객관적 정리
+     2단계 → 감정까지 반영
+  ========================================================= */
+
+  const handleAiReview = async () => {
+
+    if (!hasContent) {
+
+      alert(
+        '먼저 오늘의 기록을 남겨주세요.'
+      );
+
+      return;
+    }
+
+
+    setAiLoading(true);
+
+
+    try {
+
+      /*
+       * 현재는 실제 AI API 연결 전.
+       *
+       * 나중에 API 연결할 때도
+       * stage 1 / stage 2 구조는 그대로 사용할 수 있다.
+       */
+
+      await new Promise(
+        resolve =>
+          setTimeout(resolve, 500)
+      );
+
+
+      if (aiStage === 0) {
+
+        const result =
+          createStageOneReview();
+
+        setAiReview(result);
+        setAiStage(1);
+
+      } else {
+
+        const result =
+          createStageTwoReview();
+
+        setAiReview(result);
+        setAiStage(2);
+
       }
 
+    } finally {
 
-      setAiLoading(true);
-
-
-      setTimeout(() => {
-
-        setAiReview({
-          review:
-            '오늘의 마무리 기능은 준비되어 있어요.\\n\\n현재는 AI 연결 전 단계라 실제 분석은 아직 하지 않아요. 다음 단계에서 오늘의 일기와 가계부 기록을 바탕으로 객관적이지만 따뜻한 총평을 연결할 수 있어요.',
-          createdAt:
-            new Date().toISOString()
-        });
-
-        setAiLoading(false);
-
-      }, 500);
-    };
+      setAiLoading(false);
+    }
+  };
 
 
-  // ─────────────────────────────────────────────
-  // 화면
-  // ─────────────────────────────────────────────
+  /* =========================================================
+     화면
+  ========================================================= */
 
   return (
 
     <div
       style={{
-        padding:
-          '20px 16px 100px',
-
-        background:
-          'var(--bg)'
+        padding: '20px 16px 100px',
+        background: 'var(--bg)'
       }}
     >
 
-      {/* 저장 / 업로드 중 */}
+      {/* =====================================================
+          업로드 / 저장 중
+      ===================================================== */}
 
       {uploading && (
 
@@ -954,37 +1176,23 @@ export default function DiaryTab({
           style={{
             position: 'fixed',
             inset: 0,
-
             background:
               'rgba(30,24,40,0.35)',
-
             backdropFilter:
               'blur(3px)',
-
             zIndex: 500,
-
             display: 'flex',
-
             alignItems: 'center',
-
-            justifyContent:
-              'center'
+            justifyContent: 'center'
           }}
         >
 
           <div
             style={{
-              background:
-                'var(--card)',
-
+              background: 'var(--card)',
               borderRadius: 18,
-
-              padding:
-                '24px 30px',
-
-              textAlign:
-                'center',
-
+              padding: '24px 30px',
+              textAlign: 'center',
               boxShadow:
                 '0 10px 40px rgba(40,30,60,0.15)'
             }}
@@ -1025,7 +1233,9 @@ export default function DiaryTab({
       )}
 
 
-      {/* 날짜 */}
+      {/* =====================================================
+          날짜
+      ===================================================== */}
 
       <div
         style={{
@@ -1080,18 +1290,13 @@ export default function DiaryTab({
             style={{
               fontFamily:
                 "'Noto Serif KR','Batang',serif",
-
               fontSize: 28,
-
               fontWeight: 700,
-
-              color:
-                'var(--text)'
+              color: 'var(--text)'
             }}
           >
             {m}월 {day}일
           </div>
-
 
           <div
             style={{
@@ -1136,7 +1341,9 @@ export default function DiaryTab({
       </div>
 
 
-      {/* PIN */}
+      {/* =====================================================
+          PIN 변경
+      ===================================================== */}
 
       <div
         style={{
@@ -1164,112 +1371,81 @@ export default function DiaryTab({
       </div>
 
 
-      {/* ─────────────────────────────────────────
+      {/* =====================================================
           종이 일기장
-      ───────────────────────────────────────── */}
+      ===================================================== */}
 
       <div
         style={{
           position: 'relative',
-
-          background:
-            'var(--card)',
-
+          background: 'var(--card)',
           borderRadius: 6,
-
-          padding:
-            '28px 22px 38px',
-
+          padding: '28px 22px 38px',
           border:
             '1px solid rgba(110,90,130,0.10)',
-
           boxShadow:
             '0 8px 30px rgba(70,55,90,0.07)',
-
           overflow: 'hidden'
         }}
       >
 
-        {/* 종이 왼쪽 여백선 */}
+        {/* 왼쪽 여백선 */}
 
         <div
           style={{
             position: 'absolute',
-
             left: 12,
             top: 0,
             bottom: 0,
-
             width: 1,
-
             background:
               'rgba(150,120,170,0.08)'
           }}
         />
 
 
-        {/* 제목 */}
+        {/* =================================================
+            제목
+        ================================================= */}
 
         <input
-          value={
-            draft.title
-          }
-
+          value={draft.title}
           onChange={e =>
             updateDraft({
-              title:
-                e.target.value
+              title: e.target.value
             })
           }
-
           placeholder="오늘의 제목"
-
           style={{
             width: '100%',
-
             border: 'none',
-
-            background:
-              'transparent',
-
-            color:
-              'var(--text)',
-
+            background: 'transparent',
+            color: 'var(--text)',
             fontFamily:
               "'Noto Serif KR','Batang',serif",
-
             fontSize: 25,
-
             fontWeight: 700,
-
-            padding:
-              '4px 0 12px',
-
+            padding: '4px 0 12px',
             outline: 'none',
-
-            boxSizing:
-              'border-box'
+            boxSizing: 'border-box'
           }}
         />
 
 
-        {/* 감정 */}
+        {/* =================================================
+            감정
+        ================================================= */}
 
         <div
           style={{
             display: 'flex',
-
-            alignItems:
-              'center',
-
+            alignItems: 'center',
             gap: 5,
-
             marginBottom: 20,
-
             paddingBottom: 16,
-
             borderBottom:
-              '1px dashed var(--border)'
+              '1px dashed var(--border)',
+            flexWrap: 'wrap'
           }}
         >
 
@@ -1284,14 +1460,10 @@ export default function DiaryTab({
           </span>
 
 
-          {EMOTIONS.map(
-            emotion => (
+          {EMOTIONS.map(emotion => (
 
             <button
-              key={
-                emotion.label
-              }
-
+              key={emotion.label}
               onClick={() =>
                 updateDraft({
                   emotion:
@@ -1301,34 +1473,23 @@ export default function DiaryTab({
                       : emotion.label
                 })
               }
-
-              title={
-                emotion.label
-              }
-
+              title={emotion.label}
               style={{
                 width: 30,
                 height: 30,
-
-                borderRadius:
-                  '50%',
-
+                borderRadius: '50%',
                 border:
                   draft.emotion ===
                   emotion.label
                     ? '1.5px solid var(--accent)'
                     : '1px solid transparent',
-
                 background:
                   draft.emotion ===
                   emotion.label
                     ? 'var(--accent-bg)'
                     : 'transparent',
-
                 fontSize: 17,
-
-                cursor:
-                  'pointer'
+                cursor: 'pointer'
               }}
             >
               {emotion.emoji}
@@ -1339,12 +1500,15 @@ export default function DiaryTab({
         </div>
 
 
-        {/* ───────────────────────────────────────
+        {/* =================================================
             블록
-        ─────────────────────────────────────── */}
+        ================================================= */}
 
-        {draft.blocks.map(
-          (block, index) => {
+        {draft.blocks.map((block, index) => {
+
+          /* -----------------------------------------------
+             TEXT
+          ----------------------------------------------- */
 
           if (
             block.type === 'text'
@@ -1353,77 +1517,46 @@ export default function DiaryTab({
             return (
 
               <div
-                key={
-                  block.id
-                }
-
+                key={block.id}
                 style={{
-                  position:
-                    'relative',
-
-                  marginBottom:
-                    12
+                  position: 'relative',
+                  marginBottom: 12
                 }}
               >
 
                 <textarea
-                  data-block-id={
-                    block.id
-                  }
+                  data-block-id={block.id}
                   data-diary-textarea="true"
-
                   value={
-                    block.content ||
-                    ''
+                    block.content || ''
                   }
-
                   onChange={e =>
                     updateTextBlock(
                       block.id,
                       e.target.value
                     )
                   }
-
                   placeholder={
                     index === 0
                       ? '오늘 있었던 일을 천천히 적어보세요.'
                       : '그리고 또 어떤 일이 있었나요?'
                   }
-
                   rows={1}
-
                   style={{
                     width: '100%',
-
-                    minHeight:
-                      34,
-
+                    minHeight: 34,
                     border: 'none',
-
                     outline: 'none',
-
                     resize: 'vertical',
-
-                    overflow:
-                      'hidden',
-
-                    background:
-                      'transparent',
-
-                    color:
-                      'var(--text)',
-
+                    overflow: 'hidden',
+                    background: 'transparent',
+                    color: 'var(--text)',
                     fontFamily:
                       "'Noto Serif KR','Batang',serif",
-
                     fontSize: 15,
-
                     lineHeight: 2,
-
-                    boxSizing:
-                      'border-box'
+                    boxSizing: 'border-box'
                   }}
-
                   onInput={e => {
 
                     e.target.style.height =
@@ -1438,73 +1571,20 @@ export default function DiaryTab({
                   }}
                 />
 
-
-                {/* 글 뒤에 사진 추가 */}
-
-                <button
-                  onClick={() => {
-
-                    setDraft(prev => {
-
-                      const newImage = {
-                        id: uid(),
-                        type: 'image',
-                        src: '',
-                        file: null,
-                        comment: ''
-                      };
-
-                      const newText = {
-                        id: uid(),
-                        type: 'text',
-                        content: ''
-                      };
-
-                      const blocks =
-                        [...prev.blocks];
-
-                      const blockIndex =
-                        blocks.findIndex(
-                          b =>
-                            b.id ===
-                            block.id
-                        );
-
-                      blocks.splice(
-                        blockIndex + 1,
-                        0,
-                        newImage,
-                        newText
-                      );
-
-                      return {
-                        ...prev,
-                        blocks
-                      };
-                    });
-
-                  }}
-
-                  style={{
-                    display: 'none'
-                  }}
-                >
-                  사진
-                </button>
-
               </div>
 
             );
           }
 
 
+          /* -----------------------------------------------
+             IMAGE
+          ----------------------------------------------- */
+
           if (
             block.type === 'image'
           ) {
 
-            // 아직 업로드되지 않은 이미지
-            // 실제로는 addPhotos에서
-            // 업로드 완료 후 추가된다.
             if (!block.src) {
               return null;
             }
@@ -1513,26 +1593,14 @@ export default function DiaryTab({
             return (
 
               <div
-                key={
-                  block.id
-                }
-
+                key={block.id}
                 style={{
-                  position:
-                    'relative',
-
-                  margin:
-                    '20px 4px 22px',
-
-                  background:
-                    '#fff',
-
-                  padding:
-                    '10px 10px 14px',
-
+                  position: 'relative',
+                  margin: '20px 4px 22px',
+                  background: '#fff',
+                  padding: '10px 10px 14px',
                   boxShadow:
                     '0 6px 20px rgba(50,40,60,0.12)',
-
                   transform:
                     index % 2 === 0
                       ? 'rotate(-0.5deg)'
@@ -1548,69 +1616,40 @@ export default function DiaryTab({
                       block.id
                     )
                   }
-
                   style={{
-                    position:
-                      'absolute',
-
+                    position: 'absolute',
                     top: 7,
                     right: 7,
-
                     zIndex: 2,
-
                     width: 26,
                     height: 26,
-
-                    borderRadius:
-                      '50%',
-
+                    borderRadius: '50%',
                     border: 'none',
-
                     background:
                       'rgba(30,25,35,0.55)',
-
                     color: '#fff',
-
                     fontSize: 16,
-
-                    cursor:
-                      'pointer'
+                    cursor: 'pointer'
                   }}
                 >
                   ×
                 </button>
 
 
-                {/* ★ 원본 비율 */}
+                {/* 사진 */}
 
                 <img
-                  src={
-                    block.src
-                  }
-
+                  src={block.src}
                   alt=""
-
                   onClick={() =>
-                    setViewPhoto(
-                      block
-                    )
+                    setViewPhoto(block)
                   }
-
                   style={{
-                    display:
-                      'block',
-
-                    width:
-                      '100%',
-
-                    height:
-                      'auto',
-
-                    objectFit:
-                      'contain',
-
-                    cursor:
-                      'pointer'
+                    display: 'block',
+                    width: '100%',
+                    height: 'auto',
+                    objectFit: 'contain',
+                    cursor: 'pointer'
                   }}
                 />
 
@@ -1619,53 +1658,31 @@ export default function DiaryTab({
 
                 <textarea
                   value={
-                    block.comment ||
-                    ''
+                    block.comment || ''
                   }
-
                   onChange={e =>
                     updateImageComment(
                       block.id,
                       e.target.value
                     )
                   }
-
                   placeholder="이 사진에는 어떤 기억이 있나요?"
-
                   rows={1}
-
                   style={{
                     width: '100%',
-
                     border: 'none',
-
                     outline: 'none',
-
                     resize: 'none',
-
-                    background:
-                      'transparent',
-
-                    color:
-                      '#665d68',
-
-                    textAlign:
-                      'center',
-
+                    background: 'transparent',
+                    color: '#665d68',
+                    textAlign: 'center',
                     fontFamily:
                       "'Noto Serif KR','Batang',serif",
-
                     fontSize: 12,
-
                     lineHeight: 1.6,
-
-                    fontStyle:
-                      'italic',
-
+                    fontStyle: 'italic',
                     marginTop: 8,
-
-                    boxSizing:
-                      'border-box'
+                    boxSizing: 'border-box'
                   }}
                 />
 
@@ -1680,35 +1697,25 @@ export default function DiaryTab({
         })}
 
 
-        {/* 사진 추가 */}
+        {/* =================================================
+            사진 추가
+        ================================================= */}
 
         <button
           onClick={() =>
             fileRef.current?.click()
           }
-
           style={{
             width: '100%',
-
             marginTop: 8,
-
             padding: '12px',
-
             borderRadius: 10,
-
             border:
               '1px dashed var(--border)',
-
-            background:
-              'transparent',
-
-            color:
-              'var(--sub)',
-
+            background: 'transparent',
+            color: 'var(--sub)',
             fontSize: 12,
-
-            cursor:
-              'pointer'
+            cursor: 'pointer'
           }}
         >
           ＋ 사진 한 장 남기기
@@ -1717,25 +1724,19 @@ export default function DiaryTab({
 
         <input
           ref={fileRef}
-
           type="file"
-
           accept="image/*"
-
           multiple
-
           style={{
             display: 'none'
           }}
-
           onChange={e => {
 
             addPhotos(
               e.target.files
             );
 
-            e.target.value =
-              '';
+            e.target.value = '';
 
           }}
         />
@@ -1743,7 +1744,9 @@ export default function DiaryTab({
       </div>
 
 
-      {/* 저장 */}
+      {/* =====================================================
+          저장
+      ===================================================== */}
 
       <div
         style={{
@@ -1752,37 +1755,27 @@ export default function DiaryTab({
       >
 
         <SaveBtn
-          onClick={
-            handleSave
-          }
-
+          onClick={handleSave}
           disabled={
             !hasContent ||
             uploading
           }
-
           label="오늘의 기록 저장"
         />
 
       </div>
 
 
-      {/* ─────────────────────────────────────────
+      {/* =====================================================
           오늘 마무리
-      ───────────────────────────────────────── */}
+      ===================================================== */}
 
       <div
         style={{
           marginTop: 28,
-
-          padding:
-            '22px 20px',
-
+          padding: '22px 20px',
           borderRadius: 18,
-
-          background:
-            'var(--accent-bg)',
-
+          background: 'var(--accent-bg)',
           border:
             '1px solid var(--border)'
         }}
@@ -1792,9 +1785,7 @@ export default function DiaryTab({
           style={{
             fontFamily:
               "'Noto Serif KR','Batang',serif",
-
             fontSize: 18,
-
             fontWeight: 700
           }}
         >
@@ -1805,70 +1796,77 @@ export default function DiaryTab({
         <div
           style={{
             fontSize: 11,
-
-            color:
-              'var(--sub)',
-
+            color: 'var(--sub)',
             marginTop: 5,
-
             marginBottom: 16,
-
             lineHeight: 1.7
           }}
         >
-          오늘의 기록을 바탕으로
+          오늘의 기록을 먼저 객관적으로 바라보고,
           <br />
-          객관적이지만 따뜻하게 하루를 돌아봐요.
+          그다음 지금의 감정까지 함께 돌아봐요.
         </div>
 
 
-        {aiReview ? (
+        {/* =================================================
+            AI 결과
+        ================================================= */}
+
+        {aiReview && (
 
           <div
             style={{
-              background:
-                'var(--card)',
-
+              background: 'var(--card)',
               borderRadius: 14,
-
-              padding:
-                '17px 16px',
-
+              padding: '17px 16px',
               border:
-                '1px solid var(--border)'
+                '1px solid var(--border)',
+              marginBottom: 10
             }}
           >
 
             <div
               style={{
-                fontSize: 11,
-
-                fontWeight: 700,
-
-                color:
-                  'var(--accent)',
-
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 marginBottom: 9
               }}
             >
-              JARVIS
+
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: 'var(--accent)'
+                }}
+              >
+                JARVIS
+              </div>
+
+
+              <div
+                style={{
+                  fontSize: 10,
+                  color: 'var(--sub)'
+                }}
+              >
+                {aiReview.stage === 1
+                  ? '1단계 · 객관적 정리'
+                  : '2단계 · 감정까지'}
+              </div>
+
             </div>
 
 
             <div
               style={{
-                whiteSpace:
-                  'pre-wrap',
-
+                whiteSpace: 'pre-wrap',
                 fontFamily:
                   "'Noto Serif KR','Batang',serif",
-
                 fontSize: 13,
-
                 lineHeight: 1.9,
-
-                color:
-                  'var(--text)'
+                color: 'var(--text)'
               }}
             >
               {aiReview.review}
@@ -1876,59 +1874,76 @@ export default function DiaryTab({
 
           </div>
 
-        ) : (
+        )}
 
-          <button
-            onClick={
-              handleAiReview
-            }
 
-            disabled={
+        {/* =================================================
+            단계 버튼
+        ================================================= */}
+
+        <button
+          onClick={handleAiReview}
+          disabled={
+            aiLoading ||
+            !hasContent
+          }
+          style={{
+            width: '100%',
+            padding: '14px',
+            borderRadius: 13,
+            border:
+              '1px solid var(--border)',
+            background: 'var(--card)',
+            color:
+              aiLoading
+                ? 'var(--sub)'
+                : 'var(--accent)',
+            fontSize: 13,
+            fontWeight: 700,
+            cursor:
               aiLoading ||
               !hasContent
-            }
+                ? 'default'
+                : 'pointer'
+          }}
+        >
 
+          {aiLoading
+            ? '오늘을 정리하는 중...'
+            : aiStage === 0
+              ? '① 오늘을 객관적으로 돌아보기'
+              : aiStage === 1
+                ? '② 감정까지 포함해서 마무리하기'
+                : '↻ 다시 오늘을 돌아보기'}
+
+        </button>
+
+
+        {/* =================================================
+            현재 감정 안내
+        ================================================= */}
+
+        {draft.emotion && (
+
+          <div
             style={{
-              width: '100%',
-
-              padding:
-                '14px',
-
-              borderRadius: 13,
-
-              border:
-                '1px solid var(--border)',
-
-              background:
-                'var(--card)',
-
-              color:
-                aiLoading
-                  ? 'var(--sub)'
-                  : 'var(--accent)',
-
-              fontSize: 13,
-
-              fontWeight: 700,
-
-              cursor:
-                aiLoading ||
-                !hasContent
-                  ? 'default'
-                  : 'pointer'
+              marginTop: 10,
+              textAlign: 'center',
+              fontSize: 10,
+              color: 'var(--sub)'
             }}
           >
-            {aiLoading
-              ? '오늘을 정리하는 중...'
-              : '✦ 오늘 마무리하기'}
-          </button>
+            오늘 선택한 감정 · {draft.emotion}
+          </div>
 
         )}
 
       </div>
 
 
-      {/* 달력 */}
+      {/* =====================================================
+          달력
+      ===================================================== */}
 
       {showCal && (
 
@@ -1938,15 +1953,10 @@ export default function DiaryTab({
             m,
             day
           }}
-
-          onSelect={
-            setDate
-          }
-
+          onSelect={setDate}
           onClose={() =>
             setShowCal(false)
           }
-
           dotKeys={
             Object.keys(entries)
           }
@@ -1955,7 +1965,9 @@ export default function DiaryTab({
       )}
 
 
-      {/* 사진 전체 화면 */}
+      {/* =====================================================
+          사진 전체 화면
+      ===================================================== */}
 
       {viewPhoto && (
 
@@ -1963,52 +1975,28 @@ export default function DiaryTab({
           onClick={() =>
             setViewPhoto(null)
           }
-
           style={{
             position: 'fixed',
-
             inset: 0,
-
             background:
               'rgba(20,16,25,0.92)',
-
             zIndex: 400,
-
             display: 'flex',
-
-            alignItems:
-              'center',
-
-            justifyContent:
-              'center',
-
+            alignItems: 'center',
+            justifyContent: 'center',
             padding: 20
           }}
         >
 
           <img
-            src={
-              viewPhoto.src
-            }
-
+            src={viewPhoto.src}
             alt=""
-
             style={{
-              maxWidth:
-                '100%',
-
-              maxHeight:
-                '90vh',
-
-              width:
-                'auto',
-
-              height:
-                'auto',
-
-              objectFit:
-                'contain',
-
+              maxWidth: '100%',
+              maxHeight: '90vh',
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'contain',
               borderRadius: 4
             }}
           />
@@ -2018,20 +2006,20 @@ export default function DiaryTab({
       )}
 
 
-      {/* PIN 변경 */}
+      {/* =====================================================
+          PIN 변경
+      ===================================================== */}
 
       {showSetPin && (
 
         <Modal
           title="🔒 PIN 변경"
-
           onClose={() => {
 
             setShowSetPin(false);
-
             setNewPin('');
-
             setNewPinConfirm('');
+
           }}
         >
 
@@ -2057,38 +2045,20 @@ export default function DiaryTab({
             <input
               style={{
                 width: '100%',
-
                 border:
                   '1.5px solid var(--border)',
-
                 borderRadius: 10,
-
-                padding:
-                  '10px 12px',
-
+                padding: '10px 12px',
                 fontSize: 14,
-
-                background:
-                  'var(--card)',
-
+                background: 'var(--card)',
                 outline: 'none',
-
                 letterSpacing: 8,
-
-                boxSizing:
-                  'border-box'
+                boxSizing: 'border-box'
               }}
-
               type="password"
-
               maxLength={4}
-
               inputMode="numeric"
-
-              value={
-                newPin
-              }
-
+              value={newPin}
               onChange={e =>
                 setNewPin(
                   e.target.value
@@ -2098,7 +2068,6 @@ export default function DiaryTab({
                     )
                 )
               }
-
               placeholder="••••"
             />
 
@@ -2127,38 +2096,20 @@ export default function DiaryTab({
             <input
               style={{
                 width: '100%',
-
                 border:
                   '1.5px solid var(--border)',
-
                 borderRadius: 10,
-
-                padding:
-                  '10px 12px',
-
+                padding: '10px 12px',
                 fontSize: 14,
-
-                background:
-                  'var(--card)',
-
+                background: 'var(--card)',
                 outline: 'none',
-
                 letterSpacing: 8,
-
-                boxSizing:
-                  'border-box'
+                boxSizing: 'border-box'
               }}
-
               type="password"
-
               maxLength={4}
-
               inputMode="numeric"
-
-              value={
-                newPinConfirm
-              }
-
+              value={newPinConfirm}
               onChange={e =>
                 setNewPinConfirm(
                   e.target.value
@@ -2168,7 +2119,6 @@ export default function DiaryTab({
                     )
                 )
               }
-
               placeholder="••••"
             />
 
@@ -2177,16 +2127,12 @@ export default function DiaryTab({
 
           {newPin &&
             newPinConfirm &&
-            newPin !==
-              newPinConfirm && (
+            newPin !== newPinConfirm && (
 
             <div
               style={{
-                color:
-                  'var(--red)',
-
+                color: 'var(--red)',
                 fontSize: 12,
-
                 marginBottom: 8
               }}
             >
@@ -2201,8 +2147,7 @@ export default function DiaryTab({
 
               if (
                 newPin.length === 4 &&
-                newPin ===
-                  newPinConfirm
+                newPin === newPinConfirm
               ) {
 
                 Store.set(
@@ -2210,27 +2155,21 @@ export default function DiaryTab({
                   newPin
                 );
 
-                setShowSetPin(
-                  false
-                );
-
+                setShowSetPin(false);
                 setNewPin('');
-
                 setNewPinConfirm('');
 
                 alert(
                   'PIN이 변경됐어요!'
                 );
+
               }
 
             }}
-
             disabled={
               newPin.length !== 4 ||
-              newPin !==
-                newPinConfirm
+              newPin !== newPinConfirm
             }
-
             label="PIN 저장"
           />
 
